@@ -1,21 +1,5 @@
 import * as pathUtils from "./path.js"
 
-// Node Polyfills
-const isNode = false
-try {
-    if(typeof process === 'object') { //indicates node
-        isNode = true
-        const fetch = require('node-fetch').default
-        if (typeof globalThis.fetch !== 'function') globalThis.fetch = fetch
-
-        const Blob = require('cross-blob').default
-        globalThis.Blob = Blob
-
-        if (typeof globalThis.Blob !== 'function') globalThis.Blob = Blob
-
-    }
-} catch (err) {}
-
 const getURL = (path) => {
     let url
     try { url = new URL(path).href } 
@@ -40,7 +24,7 @@ export const handleFetch = async (path, options={}, progressCallback) => {
 
 export const fetchRemote = async (url, options={}, progressCallback) => {
 
-    const response = await fetch(url, options)
+    const response = await globalThis.fetch(url, options)
 
     return new Promise(async resolve => {
 
@@ -49,7 +33,7 @@ export const fetchRemote = async (url, options={}, progressCallback) => {
             const type = response.headers.get('Content-Type')
 
             // Browser Remote Parser
-            if (isNode) {
+            if (globalThis.REMOTEESM_NODE) {
                 const buffer = await response.arrayBuffer()
                 resolve({buffer, type})
             }
