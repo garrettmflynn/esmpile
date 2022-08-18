@@ -6,14 +6,16 @@ const re = /import([ \n\t]*(?:(?:\* (?:as .+))|(?:[^ \n\t\{\}]+[ \n\t]*,?)|(?:[ 
 const moduleDataURI = (text, mimeType='text/javascript') => `data:${mimeType};base64,` + btoa(text);
 
 // Direct Import of ES6 Modules
-const esmImport = async (text) => {
+export const importFromText = async (text) => {
     let imported = await import(moduleDataURI(text))
     if (imported.default && Object.keys(imported).length === 1) imported = imported.default
     return imported
 }
 
+export const resolve = pathUtils.get
 
-const safeESMImport =  async (uri, root, onBlob, output) => {
+
+const safeImport =  async (uri, root, onBlob, output) => {
 
     let module = await import(uri).catch(e => {})
 
@@ -30,7 +32,7 @@ const safeESMImport =  async (uri, root, onBlob, output) => {
 
 
     try {
-        module = await esmImport(text)
+        module = await importFromText(text)
     }
 
     // Catch Nested Imports
@@ -69,7 +71,7 @@ const safeESMImport =  async (uri, root, onBlob, output) => {
       const isJS = extension.includes('js')
       const newURI = dependentFileWithoutRoot
       const newText = await blob.text()
-      let importedText = (isJS) ? await safeESMImport(newURI, uri, onBlob, 'text') : newText
+      let importedText = (isJS) ? await safeImport(newURI, uri, onBlob, 'text') : newText
 
       const dataUri = moduleDataURI(importedText, mimeType);
         variables.forEach((str) => {
@@ -79,7 +81,7 @@ ${text}`;
         });
     }
 
-        module = await esmImport(text)
+        module = await importFromText(text)
     }
 
     if (output === 'text') return text
@@ -87,4 +89,4 @@ ${text}`;
 }
 }
 
-export default safeESMImport
+export default safeImport
