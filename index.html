@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    
+</body>
+<script type="module">
+    import remoteImport from './index.js';
+
+    const uriOne = 'https://raw.githubusercontent.com/garrettmflynn/phaser/main/src/index.js'
+    const uriTwo = './index.js'
+
+    const res = await remoteImport(uriOne);
+    console.log(uriOne, res)
+
+    const res2 = await remoteImport(uriTwo);
+
+    console.log(uriTwo, res2)
+
+</script>
+</html>
