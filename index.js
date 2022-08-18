@@ -50,7 +50,11 @@ const safeImport =  async (uri, root, onImport=()=>{}, output) => {
 
     // Load the WASL file
     const extension = uri.split('.').slice(-1)[0]
-    let module = await import(uri).catch(() => {}) // is available locally?
+    const isJSON = extension === "json";
+
+     let module = await (isJSON ? import(uri, { assert: { type: "json" } }) : import(uri))
+     .catch(() => { }); // is available locally?
+
     let text = await globalThis.fetch(uri).then(res => res.text())
 
     if (!module) {
