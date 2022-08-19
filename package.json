@@ -1,6 +1,6 @@
 {
   "name": "remote-esm",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Import ESM from a remote endpoint",
   "main": "index.js",
   "author": "Garrett Flynn <garrettmflynn@gmail.com>",
