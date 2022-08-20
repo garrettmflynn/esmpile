@@ -1,6 +1,7 @@
 # remote-esm
  Import ESM from a remote endpoint
 
+ In addition to standard ESM import features, this library allows for you to **import ESM text files** from any endpoint. For instance, you can load https://raw.githubusercontent.com/garrettmflynn/phaser/main/src/index.js!
 
 ## Limitations
-On remote files, you **cannot** share references across files or modify them during runtime. For example, if you export `myvariable` from `index.js` to two files and change its value during runtime, the value of `myvariable` will remain the same across both files. And if you change the value of `myvariable` in file #1, it will remain the same in file #2.
+Only variables declared initially OR objects are shared reliably across for shared **internal imports** (i.e.imports within files that are imported remotely). 

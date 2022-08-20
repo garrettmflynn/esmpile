@@ -1,6 +1,8 @@
 import * as pathUtils from "./utils/path.js";
 import { handleFetch } from "./utils/request.js";
 
+globalThis.REMOTEESM_TEXT_REFERENCES = {} // Share references betwee loaded dataurl instances
+
 // Node Polyfills
 globalThis.REMOTEESM_NODE = false
 export const ready = new Promise(async (resolve, reject) => {
@@ -29,7 +31,8 @@ const re = /import([ \n\t]*(?:(?:\* (?:as .+))|(?:[^ \n\t\{\}]+[ \n\t]*,?)|(?:[ 
 const moduleDataURI = (text, mimeType='text/javascript') => `data:${mimeType};base64,` + btoa(text);
 
 // Direct Import of ES6 Modules
-export const importFromText = async (text, extension) => {
+export const importFromText = async (text, path) => {
+    const extension = path.split('.').slice(-1)[0]
     const isJSON = extension === 'json'
     let mimeType = isJSON ? 'application/json' : 'application/javascript'
     const uri = moduleDataURI(text, mimeType)
@@ -37,13 +40,18 @@ export const importFromText = async (text, extension) => {
         if (e.message.includes('Unexpected token')) throw new Error('Failed to fetch') // Not found
         else throw e;
       });
+
+
+    globalThis.REMOTEESM_TEXT_REFERENCES[path] = imported
+
     return imported
 }
 
 export const resolve = pathUtils.get
 
+const getText = async (uri) => await globalThis.fetch(uri).then(res => res.text())
 
-const safeImport =  async (uri, root, onImport=()=>{}, output) => {
+const safeImport =  async (uri, root, onImport=()=>{}, outputText) => {
 
     // Make sure fetch is ready
     await ready
@@ -55,12 +63,13 @@ const safeImport =  async (uri, root, onImport=()=>{}, output) => {
      let module = await (isJSON ? import(uri, { assert: { type: "json" } }) : import(uri))
      .catch(() => { }); // is available locally?
 
-    let text = await globalThis.fetch(uri).then(res => res.text())
-
+     let text;
     if (!module) {
 
+        text = await getText(uri)
+
     try {
-        module = await importFromText(text, extension)
+        module = await importFromText(text, uri)
     }
 
     // Catch Nested Imports
@@ -77,43 +86,57 @@ const safeImport =  async (uri, root, onImport=()=>{}, output) => {
             if (m == null) m = re.exec(text); // be extra sure (weird bug)
             if (m) {
                 text = text.replace(m[0], ``) // Replace found text
+                const wildcard = !!m[1].match(/\*\s+as/)
                 const variables = m[1].replace(/\*\s+as/, '').trim()
-                importInfo[m[3]] = variables // Save variables to path
+                importInfo[m[3]] = {
+                    variables,
+                    wildcard
+                }
             }
         } while (m);
 
-        // Import Files
-        for (let path in importInfo) {
+        // Import Files Asynchronously
+        for (let path in importInfo){
+            const {variables, wildcard} = importInfo[path]
 
             // Check If Already Exists
             let correctPath = pathUtils.get(path, childBase)
-            const variables = importInfo[path];
+            const dependentFilePath = pathUtils.get(correctPath)
+            const dependentFileWithoutRoot = pathUtils.get(dependentFilePath.replace(root ?? '', ''))
+            
+            // Check If Already Exists
+            let ref = globalThis.REMOTEESM_TEXT_REFERENCES[dependentFilePath]
+            if (!ref) {
+                const extension = correctPath.split('.').slice(-1)[0]
+                const info = await handleFetch(correctPath);
+                let blob = new Blob([info.buffer], { type: info.type });
+                const isJS = extension.includes('js')
+                const newURI = dependentFileWithoutRoot
+                const newText = await blob.text()
+                let importedText = (isJS) ? await new Promise(async (resolve) => {
+                    await safeImport(newURI, uri, (path, info)=> {
+                        onImport(path, info)
+                        if (path == newURI) resolve(info.text)
+                    }, true) 
+                }) : newText
 
-      const dependentFilePath = pathUtils.get(correctPath)
-      const dependentFileWithoutRoot = pathUtils.get(dependentFilePath.replace(root ?? '', ''))
-      
-      const extension = correctPath.split('.').slice(-1)[0]
-    const mimeType = (extension === 'js') ? 'application/javascript' : `application/${extension}`
-    const info = await handleFetch(correctPath);
-    let blob = new Blob([info.buffer], { type: info.type });
-      const isJS = extension.includes('js')
-      const newURI = dependentFileWithoutRoot
-      const newText = await blob.text()
-      let importedText = (isJS) ? await safeImport(newURI, uri, onImport, 'text') : newText
+                await importFromText(importedText, correctPath) // registers in text references
+            }
+            
+            text = `const ${variables} =  globalThis.REMOTEESM_TEXT_REFERENCES['${correctPath}']${variables.includes('{') ? '' : (wildcard) ? '' : '.default'};
+        ${text}`;
+        }
 
-      const hasBrackets = variables.includes('{')
-      const dataUri = moduleDataURI(importedText, mimeType);
-          text = `const ${variables} =  (await import('${dataUri}', ${isJS ? '{}' : '{assert: {type: "json"}}'}))${hasBrackets ? '' : '.default'};
-${text}`;
-    }
-
-        module = await importFromText(text, extension)
+        module = await importFromText(text, uri)
     }
 }
 
-onImport(uri, {text, module})
-if (output === 'text') return text
-else return module
+onImport(uri, {
+    text: (outputText) ? (text ?? await getText(uri)) : undefined, 
+    module
+})
+
+return module
 
 }
 
