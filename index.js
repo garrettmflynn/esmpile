@@ -1,7 +1,7 @@
 import * as pathUtils from "./utils/path.js";
 import { handleFetch } from "./utils/request.js";
 
-globalThis.REMOTEESM_TEXT_REFERENCES = {} // Share references betwee loaded dataurl instances
+globalThis.REMOTEESM_TEXT_REFERENCES = {} // Share references between loaded dataurl instances
 
 // Node Polyfills
 globalThis.REMOTEESM_NODE = false
@@ -42,7 +42,18 @@ export const importFromText = async (text, path) => {
       });
 
 
-    globalThis.REMOTEESM_TEXT_REFERENCES[path] = imported
+      const ref = {}
+
+    for (let key in imported) {
+        // mimic live bindings
+        Object.defineProperty(ref, key, {
+            get: () => imported[key], // get original import value
+            // set: (input) => imported[key] = input, // NOTE: Is immutable from this interface
+            enumerable: true,
+        })
+     }
+
+     globalThis.REMOTEESM_TEXT_REFERENCES[path] = uri// ref
 
     return imported
 }
@@ -51,7 +62,12 @@ export const resolve = pathUtils.get
 
 const getText = async (uri) => await globalThis.fetch(uri).then(res => res.text())
 
-const safeImport =  async (uri, root, onImport=()=>{}, outputText) => {
+const safeImport =  async (uri, {
+    root, 
+    onImport=()=>{}, 
+    outputText,
+    forceImportFromText
+} = {}) => {
 
     // Make sure fetch is ready
     await ready
@@ -60,8 +76,10 @@ const safeImport =  async (uri, root, onImport=()=>{}, outputText) => {
     const extension = uri.split('.').slice(-1)[0]
     const isJSON = extension === "json";
 
-     let module = await (isJSON ? import(uri, { assert: { type: "json" } }) : import(uri))
-     .catch(() => { }); // is available locally?
+     let module = (!forceImportFromText) ? 
+     await (isJSON ? import(uri, { assert: { type: "json" } }) : import(uri))
+     .catch(() => { }) // is available locally?
+     : undefined;
 
      let text;
     if (!module) {
@@ -79,7 +97,7 @@ const safeImport =  async (uri, root, onImport=()=>{}, outputText) => {
         let childBase = base;
 
         // Use a Regular Expression to Splice Out the Import Details
-        const importInfo = {}
+        const importInfo = []
         let m;
         do {
             m = re.exec(text)
@@ -88,16 +106,17 @@ const safeImport =  async (uri, root, onImport=()=>{}, outputText) => {
                 text = text.replace(m[0], ``) // Replace found text
                 const wildcard = !!m[1].match(/\*\s+as/)
                 const variables = m[1].replace(/\*\s+as/, '').trim()
-                importInfo[m[3]] = {
+                importInfo.push({
+                    path: m[3],
                     variables,
                     wildcard
-                }
+                })
             }
         } while (m);
 
         // Import Files Asynchronously
-        for (let path in importInfo){
-            const {variables, wildcard} = importInfo[path]
+        for (let i in importInfo){
+            const {variables, wildcard, path} = importInfo[i]
 
             // Check If Already Exists
             let correctPath = pathUtils.get(path, childBase)
@@ -114,17 +133,22 @@ const safeImport =  async (uri, root, onImport=()=>{}, outputText) => {
                 const newURI = dependentFileWithoutRoot
                 const newText = await blob.text()
                 let importedText = (isJS) ? await new Promise(async (resolve) => {
-                    await safeImport(newURI, uri, (path, info)=> {
-                        onImport(path, info)
-                        if (path == newURI) resolve(info.text)
-                    }, true) 
+                    await safeImport(newURI, {
+                        root: uri, 
+                        onImport: (path, info)=> {
+                            onImport(path, info)
+                            if (path == newURI) resolve(info.text)
+                        }, 
+                        outputText: true,
+                        forceImportFromText
+                    }) 
                 }) : newText
 
                 await importFromText(importedText, correctPath) // registers in text references
             }
             
-            text = `const ${variables} =  globalThis.REMOTEESM_TEXT_REFERENCES['${correctPath}']${variables.includes('{') ? '' : (wildcard) ? '' : '.default'};
-        ${text}`;
+            text = `import ${(wildcard) ? '* as ' : ''}${variables} from "${globalThis.REMOTEESM_TEXT_REFERENCES[correctPath]}";\n${text}`;
+            // text = `const ${variables} =  globalThis.REMOTEESM_TEXT_REFERENCES['${correctPath}']${variables.includes('{') ? '' : (wildcard) ? '' : '.default'};\n${text}`;
         }
 
         module = await importFromText(text, uri)
