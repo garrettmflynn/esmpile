@@ -1,14 +1,13 @@
 import * as pathUtils from "./utils/path.js";
 import { handleFetch } from "./utils/request.js";
 
-globalThis.REMOTEESM_TEXT_REFERENCES = {} // Share references between loaded dataurl instances
+const datauri = {} // Share references between loaded dataurl instances
 
 // Node Polyfills
-globalThis.REMOTEESM_NODE = false
 export const ready = new Promise(async (resolve, reject) => {
     try {
         if(typeof process === 'object') { //indicates node
-            globalThis.REMOTEESM_NODE = true
+            // globalThis.REMOTEESM_NODE = true
             globalThis.fetch = (await import('node-fetch')).default
             if (typeof globalThis.fetch !== 'function') globalThis.fetch = fetch
 
@@ -28,10 +27,10 @@ export const ready = new Promise(async (resolve, reject) => {
 
 // Import ES6 Modules (and replace their imports with actual file imports!)
 const re = /import([ \n\t]*(?:(?:\* (?:as .+))|(?:[^ \n\t\{\}]+[ \n\t]*,?)|(?:[ \n\t]*\{(?:[ \n\t]*[^ \n\t"'\{\}]+[ \n\t]*,?)+\}))[ \n\t]*)from[ \n\t]*(['"])([^'"\n]+)(?:['"])([ \n\t]*assert[ \n\t]*{type:[ \n\t]*(['"])([^'"\n]+)(?:['"])})?/g 
-const moduleDataURI = (text, mimeType='text/javascript') => `data:${mimeType};base64,` + btoa(text);
+export const moduleDataURI = (text, mimeType='text/javascript') => `data:${mimeType};base64,` + btoa(text);
 
 // Direct Import of ES6 Modules
-export const importFromText = async (text, path) => {
+export const importFromText = async (text, path, collection={}) => {
     const extension = path.split('.').slice(-1)[0]
     const isJSON = extension === 'json'
     let mimeType = isJSON ? 'application/json' : 'application/javascript'
@@ -53,7 +52,7 @@ export const importFromText = async (text, path) => {
         })
      }
 
-     globalThis.REMOTEESM_TEXT_REFERENCES[path] = uri// ref
+     collection[path] = uri// ref
 
     return imported
 }
@@ -62,15 +61,23 @@ export const resolve = pathUtils.get
 
 const getText = async (uri) => await globalThis.fetch(uri).then(res => res.text())
 
-const safeImport =  async (uri, {
-    root, 
-    onImport=()=>{}, 
-    outputText,
-    forceImportFromText
-} = {}) => {
+const safeImport =  async (uri, opts = {}) => {
+
+    const {
+        root,
+        onImport = ()=>{},
+        outputText,
+        forceImportFromText
+    } = opts
+
+    const uriCollection = opts.datauri || datauri
 
     // Make sure fetch is ready
     await ready
+    
+    // Register in Tree
+    if (opts.dependencies) opts.dependencies[uri] = {}
+
 
     // Load the WASL file
     const extension = uri.split('.').slice(-1)[0]
@@ -81,13 +88,13 @@ const safeImport =  async (uri, {
      .catch(() => { }) // is available locally?
      : undefined;
 
-     let text;
+     let text, originalText;
     if (!module) {
 
-        text = await getText(uri)
+        text = originalText = await getText(uri)
 
     try {
-        module = await importFromText(text, uri)
+        module = await importFromText(text, uri, uriCollection)
     }
 
     // Catch Nested Imports
@@ -122,9 +129,11 @@ const safeImport =  async (uri, {
             let correctPath = pathUtils.get(path, childBase)
             const dependentFilePath = pathUtils.get(correctPath)
             const dependentFileWithoutRoot = pathUtils.get(dependentFilePath.replace(root ?? '', ''))
+
+            if (opts.dependencies) opts.dependencies[uri][dependentFileWithoutRoot] = importInfo[i]
             
             // Check If Already Exists
-            let ref = globalThis.REMOTEESM_TEXT_REFERENCES[dependentFilePath]
+            let ref = uriCollection[dependentFilePath]
             if (!ref) {
                 const extension = correctPath.split('.').slice(-1)[0]
                 const info = await handleFetch(correctPath);
@@ -144,21 +153,22 @@ const safeImport =  async (uri, {
                     }) 
                 }) : newText
 
-                await importFromText(importedText, correctPath) // registers in text references
+                await importFromText(importedText, correctPath, uriCollection) // registers in text references
             }
             
-            text = `import ${(wildcard) ? '* as ' : ''}${variables} from "${globalThis.REMOTEESM_TEXT_REFERENCES[correctPath]}";\n${text}`;
-            // text = `const ${variables} =  globalThis.REMOTEESM_TEXT_REFERENCES['${correctPath}']${variables.includes('{') ? '' : (wildcard) ? '' : '.default'};\n${text}`;
+            text = `import ${(wildcard) ? '* as ' : ''}${variables} from "${uriCollection[correctPath]}";\n${text}`;
         }
 
-        module = await importFromText(text, uri)
+        module = await importFromText(text, uri, uriCollection)
     }
 }
 
+let txt = outputText ? text ?? await getText(uri) : void 0
 onImport(uri, {
-    text: (outputText) ? (text ?? await getText(uri)) : undefined, 
-    module
-})
+  text: txt,
+  file: outputText ? originalText ?? txt : void 0,
+  module
+});
 
 return module
 

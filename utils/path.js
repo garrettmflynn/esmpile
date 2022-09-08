@@ -1,27 +1,16 @@
-const regex = new RegExp('https?:', 'g')
+const urlSep = '://'
+
 export const get = (path, rel = '', keepRelativeImports=false) => {
     // if (!path.includes('./')) rel = '' // absolute
 
-    const windowLocation = globalThis?.location?.origin
-
-    let pathMatch = false
-    let relMatch = false
-    
-    // Check if browser
-    if (windowLocation) {
-
-        relMatch = rel.includes(windowLocation)
-        if (relMatch){
-            rel = rel.replace(windowLocation, '');
-            if (rel[0] === '/') rel = rel.slice(1)
-        }
-
-        pathMatch = path.includes(windowLocation)
-        if (pathMatch){
-            path = path.replace(windowLocation, '');
-            if (path[0] === '/') path = path.slice(1)
-        }
+    let prefix = ''
+    const getPrefix = (str) => {
+        prefix = (str.includes(urlSep)) ? str.split(urlSep).splice(0,1) : undefined
+        if (prefix) return str.replace(`${prefix}${urlSep}`, '')
+        else return str
     }
+    if (path.includes(urlSep)) path = getPrefix(path)
+    if (rel.includes(urlSep)) rel = getPrefix(rel)
 
     if (!keepRelativeImports) rel = rel.split('/').filter(v => v != '..').join('/') // Remove leading ..
 
@@ -37,10 +26,7 @@ export const get = (path, rel = '', keepRelativeImports=false) => {
     }
 
     const splitPath = path.split("/")
-    const pathTokens = splitPath.filter((str, i) => {
-        if (splitPath[i-1] && regex.test(splitPath[i-1])) return true
-        else return !!str
-    }) // remove bookend slashes
+    const pathTokens = splitPath.filter((str, i) => !!str) // remove bookend slashes
 
     // force back if using urls
     // console.log('pathTokens', JSON.parse(JSON.stringify(pathTokens)))
@@ -60,7 +46,9 @@ export const get = (path, rel = '', keepRelativeImports=false) => {
     })
 
     // Concatenate with windowLocation if rel matched OR no rel and path matched...
-    const newPath = ((relMatch || (!rel && pathMatch)) ? `${windowLocation}/` : ``) + [...dirTokens, ...extensionTokens].join('/')
+    const newPath = [...dirTokens, ...extensionTokens].join('/')
 
-    return newPath
+    // Add prefix back if it exists
+    if (prefix) return prefix + '://' + newPath
+    else return newPath
 }

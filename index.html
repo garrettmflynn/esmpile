@@ -17,7 +17,6 @@
     const complexURI = window.location.origin + '/tests/index.js'
 
     const res = await remoteImport(uriOne);
-    
 
     console.log(uriOne, res)
 
@@ -28,16 +27,21 @@
     const complex = await remoteImport( complexURI );
     const complexFromText = await remoteImport( complexURI,  {forceImportFromText: true} );
 
+
     const delay = 1000
 
-    setTimeout(() =>{
+
+    window.onclick = () => {
         console.log('---------------- remote + direct ----------------')
         console.log(complexURI, complex.imports.default())
 
         console.log('---------------- remote + text ----------------')
         console.log(complexURI, complexFromText.imports.default())
-    }, delay)
+    }
 
+    setTimeout(() =>{
+        window.onclick()
+    }, delay)
 
 </script>
 </html>
