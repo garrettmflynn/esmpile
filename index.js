@@ -61,6 +61,34 @@ export const importFromText = async (text, path, collection={}) => {
 
 export const resolve = pathUtils.get
 
+export const getSourceMap = async (uri, text, evaluate=true) => {
+    if (!text) text = await getText(uri) // get text
+    if (text){
+        const srcMap = text.match(sourceReg)
+
+        if (srcMap) {
+            const get = async () => {
+
+                const loc = pathUtils.get(srcMap[1], uri);
+                let res = await getText(loc) // get text
+
+                // remove source map invalidation
+                if (res.slice(0, 3) === ")]}") {
+                    console.warn('Removing source map invalidation characters')
+                    res = res.substring(res.indexOf('\n'));
+                }
+                
+                // return source map
+                const out = {module: JSON.parse(res)}
+                out.text = out.file = res
+                return out
+            }
+
+            return evaluate ? get() : get
+        }
+    }
+}
+
 const getText = async (uri) => await globalThis.fetch(uri).then(res => res.text())
 
 const safeImport =  async (uri, opts = {}) => {
@@ -168,37 +196,10 @@ const safeImport =  async (uri, opts = {}) => {
 
 
 let txt = outputText ? text ?? await getText(uri) : void 0
-let sourcemap;
-if (useSource) {
-    if (!txt) txt = await getText(uri) // get text
-    if (txt){
-        const srcMap = txt.match(sourceReg)
-
-        if (srcMap) {
-            sourcemap = async () => {
-
-                const loc = pathUtils.get(srcMap[1], uri);
-                let res = await getText(loc) // get text
-
-                // remove source map invalidation
-                if (res.slice(0, 3) === ")]}") {
-                    console.warn('Removing source map invalidation characters')
-                    res = res.substring(res.indexOf('\n'));
-                } else console.warn(`Found valid source map at ${loc}`)
-                
-                // return source map
-                const out = {module: JSON.parse(res)}
-                out.text = out.file = res
-                return out
-            }
-        }
-    }
-}
 
 onImport(uri, {
   text: txt,
   file: outputText ? originalText ?? txt : void 0,
-  sourcemap,
   module
 });
 

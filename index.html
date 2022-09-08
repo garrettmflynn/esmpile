@@ -10,7 +10,7 @@
     
 </body>
 <script type="module">
-    import remoteImport from './index.js';
+    import remoteImport, {getSourceMap} from './index.js';
 
     const uriOne = 'https://raw.githubusercontent.com/garrettmflynn/phaser/main/scripts/update.js'
     const selfURI = './index.js'
@@ -21,12 +21,14 @@
 
     console.log(uriOne, res)
     
-    const source = await remoteImport(sourceURI, {useSource: true, onImport: async (path, info) => {
-        if (info.sourcemap){
-            let map = await info.sourcemap()
-            console.log('source map!', map)
+    const source = await remoteImport(sourceURI, {onImport: async (path, info) => {
+        let sourcemap = await getSourceMap(sourceURI, info.text)
+        if (sourcemap){
+            console.log('source map!', sourcemap)
         }
     }});
+
+
 
     console.log(sourceURI, source)
 
