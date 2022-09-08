@@ -24,6 +24,8 @@ export const ready = new Promise(async (resolve, reject) => {
     }
 })
 
+// source map regex
+const sourceReg = /\/\/# sourceMappingURL=(.*\.map)/
 
 // Import ES6 Modules (and replace their imports with actual file imports!)
 const re = /import([ \n\t]*(?:(?:\* (?:as .+))|(?:[^ \n\t\{\}]+[ \n\t]*,?)|(?:[ \n\t]*\{(?:[ \n\t]*[^ \n\t"'\{\}]+[ \n\t]*,?)+\}))[ \n\t]*)from[ \n\t]*(['"])([^'"\n]+)(?:['"])([ \n\t]*assert[ \n\t]*{type:[ \n\t]*(['"])([^'"\n]+)(?:['"])})?/g 
@@ -67,7 +69,8 @@ const safeImport =  async (uri, opts = {}) => {
         root,
         onImport = ()=>{},
         outputText,
-        forceImportFromText
+        forceImportFromText,
+        useSource
     } = opts
 
     const uriCollection = opts.datauri || datauri
@@ -163,10 +166,39 @@ const safeImport =  async (uri, opts = {}) => {
     }
 }
 
+
 let txt = outputText ? text ?? await getText(uri) : void 0
+let sourcemap;
+if (useSource) {
+    if (!txt) txt = await getText(uri) // get text
+    if (txt){
+        const srcMap = txt.match(sourceReg)
+
+        if (srcMap) {
+            sourcemap = async () => {
+
+                const loc = pathUtils.get(srcMap[1], uri);
+                let res = await getText(loc) // get text
+
+                // remove source map invalidation
+                if (res.slice(0, 3) === ")]}") {
+                    console.warn('Removing source map invalidation characters')
+                    res = res.substring(res.indexOf('\n'));
+                } else console.warn(`Found valid source map at ${loc}`)
+                
+                // return source map
+                const out = {module: JSON.parse(res)}
+                out.text = out.file = res
+                return out
+            }
+        }
+    }
+}
+
 onImport(uri, {
   text: txt,
   file: outputText ? originalText ?? txt : void 0,
+  sourcemap,
   module
 });
 

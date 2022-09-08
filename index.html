@@ -15,10 +15,20 @@
     const uriOne = 'https://raw.githubusercontent.com/garrettmflynn/phaser/main/scripts/update.js'
     const selfURI = './index.js'
     const complexURI = window.location.origin + '/tests/index.js'
+    const sourceURI = `http://127.0.0.1:5503/src/core/dist/index.esm.js`
 
     const res = await remoteImport(uriOne);
 
     console.log(uriOne, res)
+    
+    const source = await remoteImport(sourceURI, {useSource: true, onImport: async (path, info) => {
+        if (info.sourcemap){
+            let map = await info.sourcemap()
+            console.log('source map!', map)
+        }
+    }});
+
+    console.log(sourceURI, source)
 
     const self = await remoteImport(selfURI);
 
