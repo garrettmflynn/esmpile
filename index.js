@@ -3,6 +3,7 @@ import { handleFetch } from "./utils/request.js";
 
 const datauri = {} // Share references between loaded dataurl instances
 
+
 // Node Polyfills
 export const ready = new Promise(async (resolve, reject) => {
     try {
@@ -24,37 +25,103 @@ export const ready = new Promise(async (resolve, reject) => {
     }
 })
 
+
+// Mime Type Resolution
+const jsType =  'application/javascript'
+const mimeTypeMap = {
+  'js': jsType,
+  'mjs': jsType,
+  'cjs': jsType,
+  'json': "application/json",
+  'html': 'text/html',
+  'css': 'text/css',
+  'txt': 'text/plain',
+  'svg': 'image/svg+xml',
+  'png': 'image/png',
+  'jpg': 'image/jpeg',
+  'jpeg': 'image/jpeg',
+  'gif': 'image/gif',
+  'webp': 'image/webp',
+  
+  'mp3': 'audio/mpeg',
+  'mp4': 'video/mp4',
+  'webm': 'video/webm',
+  'ogg': 'application/ogg',
+  'wav': 'audio/wav'
+}
+
+const getMimeType = (extension) => mimeTypeMap[extension]
+
 // source map regex
 const sourceReg = /\/\/# sourceMappingURL=(.*\.map)/
 
 // Import ES6 Modules (and replace their imports with actual file imports!)
 const re = /import([ \n\t]*(?:(?:\* (?:as .+))|(?:[^ \n\t\{\}]+[ \n\t]*,?)|(?:[ \n\t]*\{(?:[ \n\t]*[^ \n\t"'\{\}]+[ \n\t]*,?)+\}))[ \n\t]*)from[ \n\t]*(['"])([^'"\n]+)(?:['"])([ \n\t]*assert[ \n\t]*{type:[ \n\t]*(['"])([^'"\n]+)(?:['"])})?/g 
-export const moduleDataURI = (text, mimeType='text/javascript') => `data:${mimeType};base64,` + btoa(text);
+
+function _arrayBufferToBase64( buffer ) {
+    var binary = '';
+    var bytes = new Uint8Array( buffer );
+    var len = bytes.byteLength;
+    for (var i = 0; i < len; i++) {
+        binary += String.fromCharCode( bytes[ i ] );
+    }
+    return window.btoa( binary );
+  }
+  
+  
+export const moduleDataURI = (o, mimeType = "text/javascript", method, safe=false) => {
+    const base64 = (method === 'buffer') ? _arrayBufferToBase64(o) : btoa((safe) ? unescape(encodeURIComponent(o)) : o)
+    return `data:${mimeType};base64,` + base64
+  }
+
+const catchFailedModule = async (uri, e) => {
+    if (e.message.includes('The string to be encoded contains characters outside of the Latin1 range.')) {
+        return await new Promise(((resolve, reject) => {
+  
+        const script = document.createElement('script')
+  
+          let r = false
+          script.onload = script.onreadystatechange = function() {
+            if ( !r && (!this.readyState || this.readyState == 'complete') ) {
+              r = true
+              resolve(window)
+            }
+        }
+  
+          script.onerror = reject
+  
+  
+            script.src=uri;
+            document.body.insertAdjacentElement('beforeend', script)
+      }))
+
+  } else throw e
+  }
+  
 
 // Direct Import of ES6 Modules
-export const importFromText = async (text, path, collection={}) => {
+export const importResponse = async (info, path, collection={}, type="buffer") => {
     const extension = path.split('.').slice(-1)[0]
     const isJSON = extension === 'json'
-    let mimeType = isJSON ? 'application/json' : 'application/javascript'
-    const uri = moduleDataURI(text, mimeType)
-    let imported = await (isJSON ? import(uri, { assert: { type: "json" } }) : import(uri)).catch((e) => {
-        if (e.message.includes('Unexpected token')) throw new Error('Failed to fetch') // Not found
-        else throw e;
-      });
+    let mimeType = getMimeType(extension)
+    let reference = null;
+    let imported = null;
+  
+    const importURI = async (uri) => await (isJSON ? import(uri, { assert: { type: "json" } }) : import(uri)).catch((e) => {throw e});
+  
+    try {
+      reference = moduleDataURI(info, mimeType, type);
+      imported = await importURI(reference).catch(e => {throw e});
+    } 
+    
+    // Handle Exceptions
+    catch (e) {
+      reference = moduleDataURI(info, mimeType, type, true);
+      if (mimeType === jsType) imported = reference = await catchFailedModule(reference, e).catch(e => {throw e}); // javascript script tag imports
+      else imported = reference // audio / video assets
+    }
 
-
-      const ref = {}
-
-    for (let key in imported) {
-        // mimic live bindings
-        Object.defineProperty(ref, key, {
-            get: () => imported[key], // get original import value
-            // set: (input) => imported[key] = input, // NOTE: Is immutable from this interface
-            enumerable: true,
-        })
-     }
-
-     collection[path] = uri// ref
+     collection[path] = reference
 
     return imported
 }
@@ -62,7 +129,7 @@ export const importFromText = async (text, path, collection={}) => {
 export const resolve = pathUtils.get
 
 export const getSourceMap = async (uri, text, evaluate=true) => {
-    if (!text) text = await getText(uri) // get text
+    if (!text) text = await getResponse(uri) // get text
     if (text){
         const srcMap = text.match(sourceReg)
 
@@ -70,7 +137,7 @@ export const getSourceMap = async (uri, text, evaluate=true) => {
             const get = async () => {
 
                 const loc = pathUtils.get(srcMap[1], uri);
-                let res = await getText(loc) // get text
+                let res = await getResponse(loc) // get text
 
                 // remove source map invalidation
                 if (res.slice(0, 3) === ")]}") {
@@ -89,7 +156,16 @@ export const getSourceMap = async (uri, text, evaluate=true) => {
     }
 }
 
-const getText = async (uri) => await globalThis.fetch(uri).then(res => res.text())
+var enc = new TextDecoder("utf-8");
+var getResponse = async (uri) => {
+  const response = await globalThis.fetch(uri)
+  const buffer = await response.arrayBuffer()
+  return {
+    response,
+    buffer,
+    text: enc.decode(buffer)
+  }
+}
 
 const safeImport =  async (uri, opts = {}) => {
 
@@ -98,7 +174,9 @@ const safeImport =  async (uri, opts = {}) => {
         onImport = ()=>{},
         outputText,
         forceImportFromText,
-        useSource
+        // useSource,
+        nodeModules = 'node_modules', // at base
+        rootRelativeTo = './'
     } = opts
 
     const uriCollection = opts.datauri || datauri
@@ -120,19 +198,15 @@ const safeImport =  async (uri, opts = {}) => {
      : undefined;
 
      let text, originalText;
-    if (!module) {
-
-        text = originalText = await getText(uri)
-
+    if (!module || outputText) {
+        const response = await getResponse(uri)
+        text = originalText = response.text
     try {
-        module = await importFromText(text, uri, uriCollection)
+        module = await importResponse(response.buffer, uri, uriCollection)
     }
 
     // Catch Nested Imports
     catch (e) {
-
-        const base = pathUtils.get("", uri);
-        let childBase = base;
 
         // Use a Regular Expression to Splice Out the Import Details
         const importInfo = []
@@ -156,50 +230,96 @@ const safeImport =  async (uri, opts = {}) => {
         for (let i in importInfo){
             const {variables, wildcard, path} = importInfo[i]
 
+            const isAbsolute = path[0] !== '.'
+
             // Check If Already Exists
-            let correctPath = pathUtils.get(path, childBase)
+            let correctPath = pathUtils.get(path, uri)
+
+
+            // Assume node_modules is at the base
+            if (isAbsolute) {
+                const base = pathUtils.get(path, nodeModules)
+                const getPath = (path) => pathUtils.get(pathUtils.get(path, base), rootRelativeTo, true)
+
+                const pkgPath =  getPath('package.json', base)
+                try {
+                    const pkg = (await import(pkgPath, {assert: {type: 'json'}})).default
+                    const destination = pkg.module || pkg.main || 'index.js'
+                    correctPath = getPath(destination)
+                } catch (e) {
+                    console.warn(`${base} does not exist or is not at the root of the project.`)
+                }
+            }            
+
             const dependentFilePath = pathUtils.get(correctPath)
             const dependentFileWithoutRoot = pathUtils.get(dependentFilePath.replace(root ?? '', ''))
 
             if (opts.dependencies) opts.dependencies[uri][dependentFileWithoutRoot] = importInfo[i]
             
             // Check If Already Exists
+            let filesystemFallback = false
             let ref = uriCollection[dependentFilePath]
             if (!ref) {
                 const extension = correctPath.split('.').slice(-1)[0]
-                const info = await handleFetch(correctPath);
+                const info = await handleFetch(correctPath, opts?.callbacks?.progress);
                 let blob = new Blob([info.buffer], { type: info.type });
                 const isJS = extension.includes('js')
                 const newURI = dependentFileWithoutRoot
                 const newText = await blob.text()
-                let importedText = (isJS) ? await new Promise(async (resolve) => {
+                let importedText = (isJS) ? await new Promise(async (resolve, reject) => {
+                    
                     await safeImport(newURI, {
+                        ...opts,
                         root: uri, 
                         onImport: (path, info)=> {
                             onImport(path, info)
                             if (path == newURI) resolve(info.text)
                         }, 
                         outputText: true,
-                        forceImportFromText
-                    }) 
+                        datauri: uriCollection
+                    }).catch((e) => {
+                            // TODO: Ensure that you get a valid set of errors...
+                            const urlNoBase = isAbsolute ? path : correctPath.replace(`${rootRelativeTo.split('/').slice(0, -1).join('/')}/`, '')
+                            console.warn(`Failed to fetch ${newURI}. Checking filesystem references...`)
+                            filesystemFallback = opts.filesystem?._fallbacks?.[urlNoBase]
+                          if(filesystemFallback) {
+                            console.warn(`Got fallback reference for ${newURI}.`, )
+                            resolve();
+                          } else {
+                            const middle = 'was not resolved locally. You can provide a direct reference to use in'
+                            if (e.message.includes(middle)) reject(e);
+                            else reject(new Error(`${newURI} ${middle} options.filesystem._fallbacks['${urlNoBase}'].`))
+                          }
+                      }) 
                 }) : newText
 
-                await importFromText(importedText, correctPath, uriCollection) // registers in text references
+                if (filesystemFallback) uriCollection[correctPath] = filesystemFallback
+                else await importResponse(importedText, correctPath, uriCollection, 'text') // registers in text references
             }
             
-            text = `import ${(wildcard) ? '* as ' : ''}${variables} from "${uriCollection[correctPath]}";\n${text}`;
+
+            // Handle datauri
+            if (typeof uriCollection[correctPath] === 'string') {
+                text =  `import ${wildcard ? "* as " : ""}${variables} from "${uriCollection[correctPath]}";
+                ${text}`;
+            } 
+            
+            // Handle objects
+            else {
+                if (!window.GLOBAL_REMOTEESM_COLLECTION) window.GLOBAL_REMOTEESM_COLLECTION = {}
+                window.GLOBAL_REMOTEESM_COLLECTION[correctPath] = uriCollection[correctPath]
+                text =  `const ${variables} = window.GLOBAL_REMOTEESM_COLLECTION["${correctPath}"];
+                ${text}`;
+            }
         }
 
-        module = await importFromText(text, uri, uriCollection)
+        module = await importResponse(text, uri, uriCollection, 'text')
     }
 }
 
-
-let txt = outputText ? text ?? await getText(uri) : void 0
-
 onImport(uri, {
-  text: txt,
-  file: outputText ? originalText ?? txt : void 0,
+  text,
+  file: outputText ? originalText : void 0,
   module
 });
 

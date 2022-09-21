@@ -1,6 +1,7 @@
 const urlSep = '://'
 
 export const get = (path, rel = '', keepRelativeImports=false) => {
+
     // if (!path.includes('./')) rel = '' // absolute
 
     let prefix = ''
@@ -9,6 +10,7 @@ export const get = (path, rel = '', keepRelativeImports=false) => {
         if (prefix) return str.replace(`${prefix}${urlSep}`, '')
         else return str
     }
+
     if (path.includes(urlSep)) path = getPrefix(path)
     if (rel.includes(urlSep)) rel = getPrefix(rel)
 
@@ -28,15 +30,6 @@ export const get = (path, rel = '', keepRelativeImports=false) => {
     const splitPath = path.split("/")
     const pathTokens = splitPath.filter((str, i) => !!str) // remove bookend slashes
 
-    // force back if using urls
-    // console.log('pathTokens', JSON.parse(JSON.stringify(pathTokens)))
-    // if (matches) {
-    //     dirTokens.forEach((_, i) => {
-    //         if (pathTokens[i] != '..') pathTokens.unshift('..')
-    //     })
-    // }
-    // console.log('pathTokens', JSON.parse(JSON.stringify(pathTokens)))
-
     const extensionTokens = pathTokens.filter((str, i) => {
         if (str === '..') {
             dirTokens.pop() // Pop off directories
@@ -47,6 +40,7 @@ export const get = (path, rel = '', keepRelativeImports=false) => {
 
     // Concatenate with windowLocation if rel matched OR no rel and path matched...
     const newPath = [...dirTokens, ...extensionTokens].join('/')
+
 
     // Add prefix back if it exists
     if (prefix) return prefix + '://' + newPath
