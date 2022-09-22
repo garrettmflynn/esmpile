@@ -1,6 +1,6 @@
 const urlSep = '://'
 
-export const get = (path, rel = '', keepRelativeImports=false) => {
+export const get = (path, rel = '', keepRelativeImports=false, isDirectory = false) => {
 
     // if (!path.includes('./')) rel = '' // absolute
 
@@ -21,10 +21,12 @@ export const get = (path, rel = '', keepRelativeImports=false) => {
     let dirTokens = rel.split('/')
     if (dirTokens.length === 1 && dirTokens[0] === '') dirTokens = [] // Remove consequence of empty string rel
 
-    const potentialFile = dirTokens.pop() // remove file name
-    if (potentialFile) {
-        const splitPath = potentialFile.split('.')
-       if (splitPath.length == 1 || (splitPath.length > 1 && splitPath.includes(''))) dirTokens.push(potentialFile) // ASSUMPTION: All files have an extension
+    if (isDirectory){
+        const potentialFile = dirTokens.pop() // remove file name
+        if (potentialFile) {
+            const splitPath = potentialFile.split('.')
+        if (splitPath.length == 1 || (splitPath.length > 1 && splitPath.includes(''))) dirTokens.push(potentialFile) // ASSUMPTION: All files have an extension
+        }
     }
 
     const splitPath = path.split("/")
