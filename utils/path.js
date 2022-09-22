@@ -21,7 +21,7 @@ export const get = (path, rel = '', keepRelativeImports=false, isDirectory = fal
     let dirTokens = rel.split('/')
     if (dirTokens.length === 1 && dirTokens[0] === '') dirTokens = [] // Remove consequence of empty string rel
 
-    if (isDirectory){
+    if (!isDirectory){
         const potentialFile = dirTokens.pop() // remove file name
         if (potentialFile) {
             const splitPath = potentialFile.split('.')

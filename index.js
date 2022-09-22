@@ -75,7 +75,10 @@ export const moduleDataURI = (o, mimeType = "text/javascript", method, safe=fals
   }
 
 const catchFailedModule = async (uri, e) => {
-    if (e.message.includes('The string to be encoded contains characters outside of the Latin1 range.')) {
+    if (
+        e.message.includes('The string to be encoded contains characters outside of the Latin1 range.') // cannot be represented as a datauri
+        || e.message.includes('Cannot set properties of undefined') // will not appropriately load to the window
+    ) {
         return await new Promise(((resolve, reject) => {
   
         const script = document.createElement('script')
@@ -167,6 +170,28 @@ var getResponse = async (uri) => {
   }
 }
 
+
+const defaults = {
+    nodeModules: 'node_modules',
+    rootRelativeTo: './'
+}
+
+export const resolveNodeModule = async (path, opts) => {
+    const nodeModules = opts.nodeModules ?? defaults.nodeModules
+    const rootRelativeTo = opts.rootRelativeTo ?? defaults.rootRelativeTo
+
+    const base = pathUtils.get(path, nodeModules)
+    const getPath = (str) => pathUtils.get(pathUtils.get(str, base, false, path.split('/').length === 1), rootRelativeTo, true)
+    const pkgPath =  getPath('package.json', base)
+    try {
+        const pkg = (await import(pkgPath, {assert: {type: 'json'}})).default
+        const destination = pkg.module || pkg.main || 'index.js'
+        return getPath(destination)
+    } catch (e) {
+        console.warn(`${base} does not exist or is not at the root of the project.`)
+    }
+}
+
 const safeImport =  async (uri, opts = {}) => {
 
     const {
@@ -174,9 +199,7 @@ const safeImport =  async (uri, opts = {}) => {
         onImport = ()=>{},
         outputText,
         forceImportFromText,
-        // useSource,
-        nodeModules = 'node_modules', // at base
-        rootRelativeTo = './'
+        rootRelativeTo = defaults.rootRelativeTo
     } = opts
 
     const uriCollection = opts.datauri || datauri
@@ -235,20 +258,8 @@ const safeImport =  async (uri, opts = {}) => {
             // Check If Already Exists
             let correctPath = pathUtils.get(path, uri)
 
-
             // Assume node_modules is at the base
-            if (isAbsolute) {
-                const base = pathUtils.get(path, nodeModules)
-                const getPath = (path) => pathUtils.get(pathUtils.get(path, base, false, path.split('/').length === 1), rootRelativeTo, true)
-                const pkgPath =  getPath('package.json', base)
-                try {
-                    const pkg = (await import(pkgPath, {assert: {type: 'json'}})).default
-                    const destination = pkg.module || pkg.main || 'index.js'
-                    correctPath = getPath(destination)
-                } catch (e) {
-                    console.warn(`${base} does not exist or is not at the root of the project.`)
-                }
-            }            
+            if (isAbsolute)  correctPath = await resolveNodeModule(path, opts)
 
             const dependentFilePath = pathUtils.get(correctPath)
             const dependentFileWithoutRoot = pathUtils.get(dependentFilePath.replace(root ?? '', ''))
@@ -277,7 +288,6 @@ const safeImport =  async (uri, opts = {}) => {
                         outputText: true,
                         datauri: uriCollection
                     }).catch((e) => {
-                            // TODO: Ensure that you get a valid set of errors...
                             const urlNoBase = isAbsolute ? path : correctPath.replace(`${rootRelativeTo.split('/').slice(0, -1).join('/')}/`, '')
                             console.warn(`Failed to fetch ${newURI}. Checking filesystem references...`)
                             filesystemFallback = opts.filesystem?._fallbacks?.[urlNoBase]
@@ -303,13 +313,13 @@ const safeImport =  async (uri, opts = {}) => {
                 ${text}`;
             } 
             
-            // Handle objects
-            else {
-                if (!window.GLOBAL_REMOTEESM_COLLECTION) window.GLOBAL_REMOTEESM_COLLECTION = {}
-                window.GLOBAL_REMOTEESM_COLLECTION[correctPath] = uriCollection[correctPath]
-                text =  `const ${variables} = window.GLOBAL_REMOTEESM_COLLECTION["${correctPath}"];
-                ${text}`;
-            }
+            // IGNORE OBJECTS SINCE THESE ARE PRODUCED WHEN GLOBAL VARIABLES ARE CREATED (that we don't know the name of...)
+            // else {
+            //     if (!window.GLOBAL_REMOTEESM_COLLECTION) window.GLOBAL_REMOTEESM_COLLECTION = {}
+            //     window.GLOBAL_REMOTEESM_COLLECTION[correctPath] = uriCollection[correctPath]
+            //     text =  `const ${variables} = window.GLOBAL_REMOTEESM_COLLECTION["${correctPath}"];
+            //     ${text}`;
+            // }
         }
 
         module = await importResponse(text, uri, uriCollection, 'text')
