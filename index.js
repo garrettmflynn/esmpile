@@ -239,7 +239,7 @@ const safeImport =  async (uri, opts = {}) => {
             // Assume node_modules is at the base
             if (isAbsolute) {
                 const base = pathUtils.get(path, nodeModules)
-                const getPath = (path) => pathUtils.get(pathUtils.get(path, base, false, true), rootRelativeTo, true)
+                const getPath = (path) => pathUtils.get(pathUtils.get(path, base, false, path.split('/').length === 1), rootRelativeTo, true)
                 const pkgPath =  getPath('package.json', base)
                 try {
                     const pkg = (await import(pkgPath, {assert: {type: 'json'}})).default
