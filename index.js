@@ -179,9 +179,9 @@ const defaults = {
 export const resolveNodeModule = async (path, opts) => {
     const nodeModules = opts.nodeModules ?? defaults.nodeModules
     const rootRelativeTo = opts.rootRelativeTo ?? defaults.rootRelativeTo
-
-    const base = pathUtils.get(path, nodeModules)
-    const getPath = (str) => pathUtils.get(pathUtils.get(str, base, false, path.split('/').length === 1), rootRelativeTo, true)
+    const absoluteNodeModules = get(nodeModules, rootRelativeTo)
+    const base = pathUtils.get(path, absoluteNodeModules)
+    const getPath = (str) => pathUtils.get(str, base, false, path.split('/').length === 1)
     const pkgPath =  getPath('package.json', base)
     try {
         const pkg = (await import(pkgPath, {assert: {type: 'json'}})).default
