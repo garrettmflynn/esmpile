@@ -12,10 +12,11 @@
 <script type="module">
     import remoteImport, {getSourceMap} from './index.js';
 
-    const uriOne = 'https://raw.githubusercontent.com/garrettmflynn/phaser/main/scripts/update.js'
+    const uriOne = 'https://raw.githubusercontent.com/garrettmflynn/phaser/main/scripts/player/update.js'
     const selfURI = './index.js'
     const complexURI = window.location.origin + '/tests/index.js'
     const sourceURI = `http://127.0.0.1:5502/index.js`
+    const nodeModuleURI = 'graphscript'
 
     const res = await remoteImport(uriOne);
 
@@ -41,6 +42,12 @@
     const complex = await remoteImport( complexURI );
     const complexFromText = await remoteImport( complexURI,  {forceImportFromText: true} );
 
+    try {
+        const nodeModule = await remoteImport(nodeModuleURI);
+        console.log(nodeModule)
+    } catch (e) {
+        console.log('node_modules not served:', nodeModuleURI)
+    }
 
     const delay = 1000
 

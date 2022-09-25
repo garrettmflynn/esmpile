@@ -1,6 +1,6 @@
 import * as pathUtils from "./path.js"
 
-const getURL = (path) => {
+export const getURL = (path) => {
     let url
     try { url = new URL(path).href } 
     catch { url = pathUtils.get(path, globalThis.location.href) }

@@ -2,10 +2,25 @@
 # yarn lockfile v1
 
 
+better-sse@~0.8.0:
+  version "0.8.0"
+  resolved "https://registry.yarnpkg.com/better-sse/-/better-sse-0.8.0.tgz#2939fae49209f3e00d16da3edfe039a09a941177"
+  integrity sha512-ymOse8R0L+R2S1W85yOGkkc+yTzAmo52S4erjxPyBVwpqjpS+X228BG7hDwgKsGV/D51YhCYd+eaDwJ+sL5JhA==
+
 blob-polyfill@^6.0.20211015:
   version "6.0.20211015"
   resolved "https://registry.yarnpkg.com/blob-polyfill/-/blob-polyfill-6.0.20211015.tgz#7c47e62347e302e8d1d1ee5e140b881f74bdb23e"
   integrity sha512-OGL4bm6ZNpdFAvQugRlQy5MNly8gk15aWi/ZhQHimQsrx9WKD05r+v+xNgHCChLER3MH+9KLAhzuFlwFKrH1Yw==
+
+brainsatplay-math@~0.0.23:
+  version "0.0.25"
+  resolved "https://registry.yarnpkg.com/brainsatplay-math/-/brainsatplay-math-0.0.25.tgz#190d54fffed8270c9482273313f8f09420f63137"
+  integrity sha512-J2s+/4osnjVVqqKVwuCuYbr9eGhXF4eFsGq/ImPIHICx0+1hJHoUN1XVCyiC8rOM7Nf0/8mmtVknzEeayVc7sQ==
+
+bson-objectid@~2.0.3:
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/bson-objectid/-/bson-objectid-2.0.3.tgz#d840185172846b2f10c42ce2bcdb4a50956a9db5"
+  integrity sha512-WYwVtY9yqk179EPMNuF3vcxufdrGLEo2XwqdRVbfLVe9X6jLt7WKZQgP+ObOcprakBGbHxzl76tgTaieqsH29g==
 
 cross-blob@^3.0.1:
   version "3.0.1"
@@ -35,6 +50,17 @@ formdata-polyfill@^4.0.10:
   dependencies:
     fetch-blob "^3.1.2"
 
+graphscript@~0.1.41:
+  version "0.1.41"
+  resolved "https://registry.yarnpkg.com/graphscript/-/graphscript-0.1.41.tgz#c1bc70fc17db464d79e432b414f19d3d08a75923"
+  integrity sha512-ghgUJWSzmal9OcInneC4OsAfRS9wEz8+8Z98KLrgHhOyyuRFXLPRWpCJ+n3SCv7wDTtftcsutf5gn0BfSkpx1Q==
+  dependencies:
+    better-sse "~0.8.0"
+    brainsatplay-math "~0.0.23"
+    bson-objectid "~2.0.3"
+    web-worker "~1.2.0"
+    ws "~8.8.1"
+
 node-domexception@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/node-domexception/-/node-domexception-1.0.0.tgz#6888db46a1f71c0b76b3f7555016b63fe64766e5"
@@ -53,3 +79,13 @@ web-streams-polyfill@^3.0.3:
   version "3.2.1"
   resolved "https://registry.yarnpkg.com/web-streams-polyfill/-/web-streams-polyfill-3.2.1.tgz#71c2718c52b45fd49dbeee88634b3a60ceab42a6"
   integrity sha512-e0MO3wdXWKrLbL0DgGnUV7WHVuw9OUvL4hjgnPkIeEvESk74gAITi5G606JtZPp39cd8HA9VQzCIvA49LpPN5Q==
+
+web-worker@~1.2.0:
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/web-worker/-/web-worker-1.2.0.tgz#5d85a04a7fbc1e7db58f66595d7a3ac7c9c180da"
+  integrity sha512-PgF341avzqyx60neE9DD+XS26MMNMoUQRz9NOZwW32nPQrF6p77f1htcnjBSEV8BGMKZ16choqUG4hyI0Hx7mA==
+
+ws@~8.8.1:
+  version "8.8.1"
+  resolved "https://registry.yarnpkg.com/ws/-/ws-8.8.1.tgz#5dbad0feb7ade8ecc99b830c1d77c913d4955ff0"
+  integrity sha512-bGy2JzvzkPowEJV++hF07hAD6niYSr0JzBNo/J29WsB57A2r7Wlc1UFcTR9IzrPvuNVO4B8LGqF8qcpsVOhJCA==

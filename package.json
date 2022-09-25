@@ -6,6 +6,9 @@
   "author": "Garrett Flynn <garrettmflynn@gmail.com>",
   "license": "AGPL-3.0-or-later",
   "private": false,
+  "devDependencies": {
+    "graphscript": "~0.1.41"
+  },
   "dependencies": {
     "cross-blob": "^3.0.1",
     "node-fetch": "^3.2.10"
