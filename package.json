@@ -1,11 +1,14 @@
 {
   "name": "remote-esm",
-  "version": "0.0.28",
+  "version": "0.0.29",
   "description": "Import ESM from a remote endpoint",
   "main": "index.js",
   "author": "Garrett Flynn <garrettmflynn@gmail.com>",
   "license": "AGPL-3.0-or-later",
   "private": false,
+  "files": [
+    "utils/*"
+  ],
   "devDependencies": {
     "graphscript": "~0.1.41"
   },
