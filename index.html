@@ -14,54 +14,39 @@
 
     const basePath = (str) => str.substring(0, str.lastIndexOf("/"));
 
+    const importRemoteESM = async (path, info, opts) => {
+        const res = await remoteImport(path, info);
+        console.log(`---------------- ${opts.label} ----------------`)
+        console.log(path, res)
+        return res
+    }
+
 
     const uriOne = 'https://raw.githubusercontent.com/garrettmflynn/phaser/main/scripts/player/update.js'
     const selfURI = './index.js'
     const complexURI = basePath(window.location.href) + '/tests/index.js'
     const sourceURI = new URL('index.js', window.location.href).href
     const nodeModuleURI = 'graphscript'
-    console.log('Remote URI', uriOne)
-    console.log('Self URI', selfURI)
-    console.log('Complex URI', complexURI)
-    console.log('Source URI', sourceURI)
-    console.log('Node Module URI', nodeModuleURI)
-
-    const res = await remoteImport(uriOne);
-
-    console.log('---------------- remote ----------------')
-    console.log(uriOne, res)
-    
-    const source = await remoteImport(sourceURI, {
+    await importRemoteESM(uriOne, undefined, {label: 'remote'});
+    await importRemoteESM(sourceURI, {
         outputText: true,
         onImport: async (path, info) => {
         let sourcemap = await getSourceMap(sourceURI, info.text)
         if (sourcemap){
             console.log('source map!', sourcemap)
         }
-    }});
+    }}, {label: 'source map'});
 
-    console.log('---------------- source map uri ----------------')
-    console.log(sourceURI, source)
+    await importRemoteESM(selfURI, undefined, {label: 'self'});
 
-    const self = await remoteImport(selfURI);
-
-    console.log('---------------- self ----------------')
-    console.log(selfURI, self)
-
-    const complex = await remoteImport( complexURI );
-    console.log('---------------- remote + direct ----------------')
-    console.log(complexURI, complex.imports.default())
-
-
-    const complexFromText = await remoteImport( complexURI,  {forceImportFromText: true} );
-    console.log('---------------- remote + text ----------------')
-    console.log(complexURI, complexFromText.imports.default())
+    const complex = await importRemoteESM(complexURI, undefined, {label: 'complex uri (remote + direct)'});
+    console.log('Executed', complex.imports.default())
+    
+    const complexFromText = await importRemoteESM(complexURI, {forceImportFromText: true}, {label: 'complex uri (remote + text)'});
+    console.log('Executed',  complexFromText.imports.default())
 
     try {
-        const nodeModule = await remoteImport(nodeModuleURI);
-        console.log('---------------- node module (graphscript) ----------------')
-        console.log(nodeModuleURI, nodeModule)
-
+        await importRemoteESM(nodeModuleURI, undefined, {label: 'node module (graphscript)'});
     } catch (e) {
         console.log('node_modules not served:', nodeModuleURI)
     }
