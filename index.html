@@ -4,20 +4,52 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Remote ESM</title>
+    <style>
+        html, body {
+            height: 100vh;
+            width: 100vw;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        i {
+            font-size: 80%;
+        }
+
+        h1 {
+            margin: 0;
+        }
+
+        section {
+            padding: 50px;
+        }
+
+        li {
+            padding: 10px;
+        }
+
+    </style>
 </head>
 <body>
-    
+    <section>
+        <h1>Remote ESM</h1>
+        <i>View the Developer Console for outputs</i>
+        <ul></ul>
+    </section>
 </body>
 <script type="module">
     import remoteImport, {getSourceMap} from './index.js';
 
     const basePath = (str) => str.substring(0, str.lastIndexOf("/"));
 
+    const ul = document.body.querySelector('ul')
     const importRemoteESM = async (path, info, opts) => {
         const res = await remoteImport(path, info);
         console.log(`---------------- ${opts.label} ----------------`)
         console.log(path, res)
+        ul.insertAdjacentHTML('beforeend', `<li>Got ${path}</li>`);
         return res
     }
 
