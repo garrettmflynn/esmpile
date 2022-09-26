@@ -12,14 +12,23 @@
 <script type="module">
     import remoteImport, {getSourceMap} from './index.js';
 
+    const basePath = (str) => str.substring(0, str.lastIndexOf("/"));
+
+
     const uriOne = 'https://raw.githubusercontent.com/garrettmflynn/phaser/main/scripts/player/update.js'
     const selfURI = './index.js'
-    const complexURI = window.location.origin + '/tests/index.js'
-    const sourceURI = `http://127.0.0.1:5502/index.js`
+    const complexURI = basePath(window.location.href) + '/tests/index.js'
+    const sourceURI = new URL('index.js', window.location.href).href
     const nodeModuleURI = 'graphscript'
+    console.log('Remote URI', uriOne)
+    console.log('Self URI', selfURI)
+    console.log('Complex URI', complexURI)
+    console.log('Source URI', sourceURI)
+    console.log('Node Module URI', nodeModuleURI)
 
     const res = await remoteImport(uriOne);
 
+    console.log('---------------- remote ----------------')
     console.log(uriOne, res)
     
     const source = await remoteImport(sourceURI, {
@@ -31,38 +40,31 @@
         }
     }});
 
-
-
+    console.log('---------------- source map uri ----------------')
     console.log(sourceURI, source)
 
     const self = await remoteImport(selfURI);
 
+    console.log('---------------- self ----------------')
     console.log(selfURI, self)
 
     const complex = await remoteImport( complexURI );
+    console.log('---------------- remote + direct ----------------')
+    console.log(complexURI, complex.imports.default())
+
+
     const complexFromText = await remoteImport( complexURI,  {forceImportFromText: true} );
+    console.log('---------------- remote + text ----------------')
+    console.log(complexURI, complexFromText.imports.default())
 
     try {
         const nodeModule = await remoteImport(nodeModuleURI);
-        console.log(nodeModule)
+        console.log('---------------- node module (graphscript) ----------------')
+        console.log(nodeModuleURI, nodeModule)
+
     } catch (e) {
         console.log('node_modules not served:', nodeModuleURI)
     }
-
-    const delay = 1000
-
-
-    window.onclick = () => {
-        console.log('---------------- remote + direct ----------------')
-        console.log(complexURI, complex.imports.default())
-
-        console.log('---------------- remote + text ----------------')
-        console.log(complexURI, complexFromText.imports.default())
-    }
-
-    setTimeout(() =>{
-        window.onclick()
-    }, delay)
 
 </script>
 </html>
