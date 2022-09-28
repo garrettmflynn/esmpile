@@ -46,18 +46,23 @@
     let remoteESM = library
 
     // ---------------- Set Options ----------------
-    const options = {
-        onImport: (path, info) => {
-            if (path.includes('worker')) {
-                console.log('Creating a dummy worker!', new Worker(info.objecturl, {type:"module"}))
-            }
-        },
-        callbacks: {
-            progress: {
-                fetch: (path, i, total, done, range) => {
-                    if (done) console.log('Fetch Complete!', path)
-                    else console.log('Fetch Progress', path, i, total, range)
-                }
+    const options = {}
+
+    options.onImport = (path, info) => {
+        if (path.includes('worker')) {
+            console.log('Creating a dummy worker!', new Worker(info.objecturl, {type:"module"}))
+        }
+    }
+
+    options.callbacks =  {
+        progress: {
+            file: (path, i, total, done) => {
+                if (done) console.log('File Complete!', path)
+                else console.log('File Progress', path, i, total, range)
+            },
+            fetch: (path, i, total, done, range) => {
+                if (done) console.log('Fetch Complete!', path)
+                else console.log('Fetch Progress', path, i, total, range)
             }
         }
     }
@@ -68,7 +73,6 @@
     options.debug = false // Show debug messages
 
     // ---------------- Declare Utilities ----------------
-    const basePath = (str) => str.substring(0, str.lastIndexOf("/"));
     const ul = document.body.querySelector('ul')
     const importRemoteESM = async (path, options, opts) => {
         const res = await remoteESM.safe(path, options).catch(e => console.error('Failed', e));
@@ -103,7 +107,7 @@
     //---------------- Start Demo ----------------
 
     const uriOne = 'https://raw.githubusercontent.com/garrettmflynn/phaser/main/scripts/player/update.js'
-    const complexURI = basePath(window.location.href) + '/tests/index.js'
+    const complexURI = remoteESM.path.base(window.location.href) + '/tests/index.js'
     const nodeModuleURI = 'device-decoder'
     const typescriptURI = 'device-decoder/stream.big.worker.ts'
 

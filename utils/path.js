@@ -73,12 +73,17 @@ export const extension = (path) => {
     if (mimeTypes.map[ext]) return ext
 }
 
+
+// Remove File Name
+export const base = (str) => str.substring(0, str.lastIndexOf("/"));
+
+
 export const noBase = (path, opts) => {
     const absolutePath = absolute(path)
     const rootRelativeTo = opts.rootRelativeTo ?? nodeModules.defaults.rootRelativeTo
     const nodeModulePath = opts.nodeModules ?? nodeModules.defaults.nodeModules
 
-    const noLocalPath = (globalThis.location) ? path.replace(`${globalThis.location.origin}/`, "") : path
+    const noLocalPath = (globalThis.location) ? path.replace(`${base(globalThis.location.href)}/`, "") : path
     
     // Pass Absolute
     if (absolutePath) return noLocalPath

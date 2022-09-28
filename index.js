@@ -14,6 +14,7 @@ globalThis.REMOTEESM_BUNDLES = {global: {}} // Share references between loaded d
 const re = /[^\n]*(?<![\/\/])import\s+([ \n\t]*(?:(?:\* (?:as .+))|(?:[^ \n\t\{\}]+[ \n\t]*,?)|(?:[ \n\t]*\{(?:[ \n\t]*[^ \n\t"'\{\}]+[ \n\t]*,?)+\}))[ \n\t]*)from[ \n\t]*(['"])([^'"\n]+)(?:['"])([ \n\t]*assert[ \n\t]*{type:[ \n\t]*(['"])([^'"\n]+)(?:['"])})?/gm;
 
 export const resolve = pathUtils.get
+export const path = pathUtils
 
 const global = globalThis.REMOTEESM_BUNDLES.global
 const setBundle = (info, opts) => {
@@ -198,6 +199,8 @@ function getBundle(id, key) {
 // ------------- Safely Import Module -------------
 export const safe = async (uri, opts = {}) => {
 
+    console.log('opts', opts)
+
     opts = Object.assign({}, opts) // copy options
 
     const {
@@ -205,7 +208,14 @@ export const safe = async (uri, opts = {}) => {
         output = {},
         forceImportFromText,
     } = opts;
-    
+
+
+    let dependenciesResolved = 0
+    let numDependencies = 0
+
+    const fileCallback = opts.callbacks?.progress?.file
+    const runFileCallback = typeof fileCallback === 'function'
+
 
     // Set Bundle ID
     if (!opts.bundle) {
@@ -230,15 +240,17 @@ export const safe = async (uri, opts = {}) => {
             .catch(() => { })
         : undefined;
 
-    let info;
+
+    let name = pathUtils.get(uri)
+
     if (!finalInfo.module || output.text || output.datauri) {
 
         // ------------------- Get URI Response -------------------
-        info = await response.safe(uri, opts)
+        const info = await response.safe(uri, opts)
+        name = pathUtils.get(info.uri)
 
         // ------------------- Try Direct Import -------------------
         try {
-
             finalInfo = await response.parse(info)
             setBundle(finalInfo, opts)
         }
@@ -261,9 +273,13 @@ export const safe = async (uri, opts = {}) => {
                 });
             })
 
+
+            numDependencies = importInfo.length
             // ------------------- Import Files Asynchronously -------------------
             const promises = importInfo.map(async (thisImport) => {
                 await internal(info, thisImport, opts) // can't stop all the requests in midflight...
+                dependenciesResolved++
+                if (runFileCallback) fileCallback(name, dependenciesResolved, numDependencies) 
             })
 
             await Promise.allSettled(promises)
@@ -274,6 +290,9 @@ export const safe = async (uri, opts = {}) => {
         }
     }
 
+
+    // ------------------- Tell the User the File is Done -------------------
+    if (runFileCallback) fileCallback(name, dependenciesResolved, numDependencies, true) 
 
     // ------------------- Pass Additional Information to the User -------------------
     onImport(uri, finalInfo);
