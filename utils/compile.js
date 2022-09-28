@@ -13,6 +13,6 @@ export const typescript = (response, type = "text") => {
         response.text = window.ts.transpile(tsCode, tsconfig.compilerOptions);
         if (type === 'buffer') response.buffer = new TextEncoder().encode(response.text); // encode to buffer
         return response[type]
-    } else throw new Error('Must load TypeScript extension to compile TypeScript files')
+    } else throw new Error('Must load TypeScript extension to compile TypeScript files using remoteESM.load.script(...);')
 
 }
