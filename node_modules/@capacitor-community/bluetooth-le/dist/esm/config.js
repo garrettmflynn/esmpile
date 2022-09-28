@@ -1,3 +1,0 @@
-/// <reference types="@capacitor/cli" />
-export {};
-//# sourceMappingURL=config.js.map

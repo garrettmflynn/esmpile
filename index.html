@@ -52,14 +52,14 @@
                 console.log('Creating a dummy worker!', new Worker(info.objecturl, {type:"module"}))
             }
         },
-        // callbacks: {
-        //     progress: {
-        //         fetch: (path, i, total, done, range) => {
-        //             if (done) console.log('Fetch Complete!', path)
-        //             else console.log('Fetch Progress', path, i, total, range)
-        //         }
-        //     }
-        // }
+        callbacks: {
+            progress: {
+                fetch: (path, i, total, done, range) => {
+                    if (done) console.log('Fetch Complete!', path)
+                    else console.log('Fetch Progress', path, i, total, range)
+                }
+            }
+        }
     }
 
     options.bundle = 'global' // Specify which bundle to reference. Specify 'global' to use same bundle across all imports. Don't specify to create a new bundle
@@ -120,7 +120,7 @@
         await importRemoteESM(nodeModuleURI, options, {label: 'node module (device-decoder distribution)'});
         await importRemoteESM(typescriptURI, options, {label: 'node module (complex typescript worker)'});
     } catch (e) {
-        console.log('node_modules not served:', nodeModuleURI, typescriptURI)
+        console.log('node_modules are not served:', nodeModuleURI, typescriptURI)
     }
 
 </script>

@@ -1,3 +1,0 @@
-declare type Queue = <T>(fn: () => Promise<T>) => Promise<T>;
-export declare function getQueue(enabled: boolean): Queue;
-export {};
