@@ -1,12 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Remote ESM</title>
     <style>
-        html, body {
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
             height: 100vh;
             width: 100vw;
             margin: 0;
@@ -30,13 +37,53 @@
             padding: 10px;
         }
 
+        #tests {
+            padding: 10px;
+        }
+
+
+        #tests > div {
+            border: 1px solid black;
+            margin-bottom: 15px;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 15px;
+        }
+
+        button {
+            padding: 5px 10px;
+            color: white;
+            border: 1px solid white;
+            background: transparent;
+            border-radius: 5px;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+
+        #tests > div > div {
+            width: 100%;
+            padding: 10px 25px;
+            background: black;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+        }
+
+
+
+
     </style>
 </head>
+
 <body>
     <section>
         <h1>Remote ESM</h1>
         <i>View the Developer Console for outputs</i>
-        <ul></ul>
+        <div id="tests"></div>
     </section>
 </body>
 <script type="module">
@@ -45,16 +92,25 @@
 
     let remoteESM = library
 
+
+    // ---------------- Set Global Variables ----------------
+    const testDiv = document.getElementById('tests')
+    const complexURI = remoteESM.path.base(window.location.href) + '/tests/index.js'
+    const sourceURI = './dist/index.esm.js'
+
     // ---------------- Set Options ----------------
     const options = {}
 
     options.onImport = (path, info) => {
+        if (path === complexURI) {
+            info.module.imports.default()
+        }
         if (path.includes('worker')) {
-            console.log('Creating a dummy worker!', new Worker(info.objecturl, {type:"module"}))
+            console.log('Creating a dummy worker!', new Worker(info.objecturl, { type: "module" }))
         }
     }
 
-    options.callbacks =  {
+    options.callbacks = {
         progress: {
             file: (path, i, total, done) => {
                 if (done) console.log('File Complete!', path)
@@ -72,60 +128,115 @@
     options.dependencies = {} // Track all file dependencies
     options.debug = false // Show debug messages
 
+    const forceText = { forceImportFromText: true }
+
+    const tests = {
+
+        remote: {
+            uri: 'https://raw.githubusercontent.com/garrettmflynn/phaser/main/scripts/player/update.js'
+        },
+
+        //---------------- Test Source Map Resolution for Self Distribution ----------------
+        sourcemap: {
+            uri: './dist/index.esm.js',
+            options: {
+                output: {
+                    text: true
+                },
+                onImport: async (path, info) => {
+                    if (path === sourceURI) {
+                        let sourcemap = await remoteESM.sourceMap.get(sourceURI, options, info.text.updated)
+                        if (sourcemap) {
+                            console.log('source map!', sourcemap)
+                        } else console.log('No source map at specified location:', sourceURI)
+                    }
+                }
+            }
+        },
+
+        remote: {
+            uri: 'https://raw.githubusercontent.com/garrettmflynn/phaser/main/scripts/player/update.js'
+        },
+
+        ['complex from native import']: {
+            uri: complexURI,
+        },
+
+        ['complex from text']: {
+            uri: complexURI
+        },
+
+        node_module: {
+            uri: 'device-decoder',
+        },
+
+        ['typescript + worker']: {
+            uri: 'device-decoder/stream.big.worker.ts',
+        }
+
+    }
+
     // ---------------- Declare Utilities ----------------
-    const ul = document.body.querySelector('ul')
     const importRemoteESM = async (path, options, opts) => {
         const res = await remoteESM.safe(path, options);
         console.log(`---------------- ${opts.label} ----------------`)
         console.log(path, res)
-        ul.insertAdjacentHTML('beforeend', `<li>${res ? 'Got' : 'Failed to get'} ${path}</li>`);
         return res
     }
 
     // ---------------- Replace Library with Self Import ----------------
-    remoteESM = await importRemoteESM('./index.js', options, {label: 'self'});
+    remoteESM = await importRemoteESM('./index.js', options, { label: 'self' });
 
     // ---------------- Preload the Typescript Service ----------------
     await remoteESM.load.script('./extensions/typescriptServices.js');
 
-    //---------------- Test Source Map Resolution for Self Distribution ----------------
-    const sourceURI = './dist/index.esm.js'
-    await importRemoteESM(sourceURI, {
-        output: {
-            text: true
-        },
-        onImport: async (path, info) => {
-            if (path === sourceURI){
-                let sourcemap = await remoteESM.sourceMap.get(sourceURI, options, info.text.updated)
-                if (sourcemap){
-                    console.log('source map!', sourcemap)
-                } else console.log('No source map at specified location:', sourceURI)
-            }
-    }}, {label: 'source map'});
+    // ---------------- Run Tests ----------------
+    for (let label in tests) {
+        let test = tests[label]
+        const div = document.createElement('div')
+        const header = document.createElement('div')
+        const ul = document.createElement('ul')
+        const h2 = document.createElement('h2')
+        
+        const buttonDiv = document.createElement('buttonDiv')
+        const button = document.createElement('button')
+        const fromText = document.createElement('button')
+
+        h2.innerText = label
+        button.innerText = 'Import'
+        fromText.innerText = 'Import from Text'
 
 
-    //---------------- Start Demo ----------------
+        buttonDiv.appendChild(button)
+        buttonDiv.appendChild(fromText)
 
-    const uriOne = 'https://raw.githubusercontent.com/garrettmflynn/phaser/main/scripts/player/update.js'
-    const complexURI = remoteESM.path.base(window.location.href) + '/tests/index.js'
-    const nodeModuleURI = 'device-decoder'
-    const typescriptURI = 'device-decoder/stream.big.worker.ts'
+        header.appendChild(h2)
+        header.appendChild(buttonDiv)
 
-    await importRemoteESM(uriOne, options, {label: 'remote'});
-    
-    const complex = await importRemoteESM(complexURI, options, {label: 'complex uri (remote + direct)'});
-    console.log('Executed', complex.imports.default())
-    
-    const complexOptions = Object.assign(Object.assign({}, options), {forceImportFromText: true})
-    const complexFromText = await importRemoteESM(complexURI, complexOptions, {label: 'complex uri (remote + text)'});
-    console.log('Executed',  complexFromText.imports.default())
+        div.appendChild(header)
+        div.appendChild(ul)
+        testDiv.appendChild(div)
 
-    try {
-        await importRemoteESM(nodeModuleURI, options, {label: 'node module (device-decoder distribution)'});
-        await importRemoteESM(typescriptURI, options, {label: 'node module (complex typescript worker)'});
-    } catch (e) {
-        console.log('node_modules are not served:', nodeModuleURI, typescriptURI)
+        const onClick = async (override) => {
+
+            const selectedOptions = test.options ?? options
+            const forceTextOptions = Object.assign(Object.assign({}, options), override)
+
+
+            ul.innerHTML = '' // clear the list
+            const res = await importRemoteESM(test.uri, selectedOptions, { label }).catch(e => {
+                console.warn(e)
+                ul.insertAdjacentHTML('beforeend', `<li>Failed to get ${test.uri}</li>`);
+            })
+
+            if (res) ul.insertAdjacentHTML('beforeend', `<li>Got ${test.uri}</li>`);
+        }
+
+        button.onclick = () => onClick()
+        fromText.onclick = () => onClick(forceText)
+
     }
 
 </script>
+
 </html>

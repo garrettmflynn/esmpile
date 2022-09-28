@@ -45,7 +45,7 @@ export const safe = async (uri, opts) => {
 
             const name = ext?.name ?? ext
             const warning = (e) => {
-                console.error(`Import using ${name ?? ext} transformation failed for ${uri}`)
+                if (opts.debug) console.error(`Import using ${name ?? ext} transformation failed for ${uri}`)
             }
 
             const transformed = await handlers.transformation(uri, ext, opts)
