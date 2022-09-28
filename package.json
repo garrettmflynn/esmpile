@@ -7,10 +7,11 @@
   "license": "AGPL-3.0-or-later",
   "private": false,
   "files": [
-    "utils/*"
+    "utils/*",
+    "extensions/*"
   ],
   "devDependencies": {
-    "graphscript": "~0.1.41"
+    "device-decoder": "^0.2.17"
   },
   "dependencies": {
     "cross-blob": "^3.0.1",

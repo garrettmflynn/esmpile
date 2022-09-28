@@ -2,6 +2,26 @@
 # yarn lockfile v1
 
 
+"@capacitor-community/bluetooth-le@~2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@capacitor-community/bluetooth-le/-/bluetooth-le-2.0.0.tgz#e1070b2580752e077e26c1d8cffe7a399d1159c5"
+  integrity sha512-RZKRml2aNKSDkmNuFhyzNtzIDmnf2dEemS00CxaQrtgXP4HCZOvMNyU7kUyhE2gethOMc/po/dR7IRXnUbpS4A==
+  dependencies:
+    "@types/web-bluetooth" "^0.0.15"
+    throat "^6.0.1"
+
+"@types/web-bluetooth@^0.0.15":
+  version "0.0.15"
+  resolved "https://registry.yarnpkg.com/@types/web-bluetooth/-/web-bluetooth-0.0.15.tgz#d60330046a6ed8a13b4a53df3813c44942ebdf72"
+  integrity sha512-w7hEHXnPMEZ+4nGKl/KDRVpxkwYxYExuHOYXyzIzCDzEZ9ZCGMAewulr9IqJu2LR4N37fcnb1XVeuZ09qgOxhA==
+
+async@^2.1.4:
+  version "2.6.4"
+  resolved "https://registry.yarnpkg.com/async/-/async-2.6.4.tgz#706b7ff6084664cd7eae713f6f965433b5504221"
+  integrity sha512-mzo5dfJYwAn29PeiJ0zvwTo04zj8HDJj0Mn8TD7sno7q12prdbnasKJHhkm2c1LgrhlJ0teaea8860oxi51mGA==
+  dependencies:
+    lodash "^4.17.14"
+
 better-sse@~0.8.0:
   version "0.8.0"
   resolved "https://registry.yarnpkg.com/better-sse/-/better-sse-0.8.0.tgz#2939fae49209f3e00d16da3edfe039a09a941177"
@@ -12,10 +32,18 @@ blob-polyfill@^6.0.20211015:
   resolved "https://registry.yarnpkg.com/blob-polyfill/-/blob-polyfill-6.0.20211015.tgz#7c47e62347e302e8d1d1ee5e140b881f74bdb23e"
   integrity sha512-OGL4bm6ZNpdFAvQugRlQy5MNly8gk15aWi/ZhQHimQsrx9WKD05r+v+xNgHCChLER3MH+9KLAhzuFlwFKrH1Yw==
 
-brainsatplay-math@~0.0.23:
+brainsatplay-math@~0.0.23, brainsatplay-math@~0.0.25:
   version "0.0.25"
   resolved "https://registry.yarnpkg.com/brainsatplay-math/-/brainsatplay-math-0.0.25.tgz#190d54fffed8270c9482273313f8f09420f63137"
   integrity sha512-J2s+/4osnjVVqqKVwuCuYbr9eGhXF4eFsGq/ImPIHICx0+1hJHoUN1XVCyiC8rOM7Nf0/8mmtVknzEeayVc7sQ==
+
+browserfs@^1.4.3:
+  version "1.4.3"
+  resolved "https://registry.yarnpkg.com/browserfs/-/browserfs-1.4.3.tgz#92ffc6063967612daccdb8566d3fc03f521205fb"
+  integrity sha512-tz8HClVrzTJshcyIu8frE15cjqjcBIu15Bezxsvl/i+6f59iNCN3kznlWjz0FEb3DlnDx3gW5szxeT6D1x0s0w==
+  dependencies:
+    async "^2.1.4"
+    pako "^1.0.4"
 
 bson-objectid@~2.0.3:
   version "2.0.3"
@@ -35,6 +63,19 @@ data-uri-to-buffer@^4.0.0:
   resolved "https://registry.yarnpkg.com/data-uri-to-buffer/-/data-uri-to-buffer-4.0.0.tgz#b5db46aea50f6176428ac05b73be39a57701a64b"
   integrity sha512-Vr3mLBA8qWmcuschSLAOogKgQ/Jwxulv3RNE4FXnYWRGujzrRWQI4m12fQqRkwX06C0KanhLr4hK+GydchZsaA==
 
+device-decoder@^0.2.17:
+  version "0.2.17"
+  resolved "https://registry.yarnpkg.com/device-decoder/-/device-decoder-0.2.17.tgz#830cf8ec3e2f67119860d2c7899d473cdfadf6cf"
+  integrity sha512-YC0RWmpmIeZ67qEZ8MO+1mhk9jQdEIUH0vt3aS+3dZRUO2Kwak0ANTHFUOZI/E2ps3gf7hSHUbhEWkcDu7/7vw==
+  dependencies:
+    "@capacitor-community/bluetooth-le" "~2.0.0"
+    brainsatplay-math "~0.0.25"
+    graphscript "~0.1.41"
+    graphscript-services "~0.1.51"
+    graphscript-services.gpu "~0.1.54"
+    graphscript-services.storage "~0.1.53"
+    webgl-plot-utils "~0.2.7"
+
 fetch-blob@^3.1.2, fetch-blob@^3.1.4:
   version "3.2.0"
   resolved "https://registry.yarnpkg.com/fetch-blob/-/fetch-blob-3.2.0.tgz#f09b8d4bbd45adc6f0c20b7e787e793e309dcce9"
@@ -50,6 +91,44 @@ formdata-polyfill@^4.0.10:
   dependencies:
     fetch-blob "^3.1.2"
 
+gpujsutils@~1.0.12:
+  version "1.0.12"
+  resolved "https://registry.yarnpkg.com/gpujsutils/-/gpujsutils-1.0.12.tgz#390874df5e6d0fdae8b674c22edc6f198a411bc0"
+  integrity sha512-Zu6k59yavNqprmGGlrZT7fEVVex1Y5MWH/Eq7N5Mx8FrYRotmhtf2H4lAtlX9kR+TxffW51JUruJXnFOEvUg4Q==
+
+graphscript-services.gpu@~0.1.54:
+  version "0.1.54"
+  resolved "https://registry.yarnpkg.com/graphscript-services.gpu/-/graphscript-services.gpu-0.1.54.tgz#b3ad3f301c686082d4ca90d9dfff62e05522a7d4"
+  integrity sha512-tOn64s/A6GhMDGN+VJyvE/9wycMyB001BzVLpI6ucRh4Q9qPYKtXeo+mfR6A5spCx6unLF70U+tu+iAReyZLxg==
+  dependencies:
+    brainsatplay-math "~0.0.25"
+    browserfs "^1.4.3"
+    bson-objectid "~2.0.3"
+    gpujsutils "~1.0.12"
+    webgl-plot-utils "~0.2.7"
+
+graphscript-services.storage@~0.1.53:
+  version "0.1.53"
+  resolved "https://registry.yarnpkg.com/graphscript-services.storage/-/graphscript-services.storage-0.1.53.tgz#674df68233e080c08857bf2e9d7a2cb1ec607127"
+  integrity sha512-B+IsS5kVtAFmXm8S1duxeXvl2ZnT/Ryt/r9irpBfhIappy25gZHdG2JjEKXflPSvNrkSrzyXV+EhQFhPNk9F7A==
+  dependencies:
+    brainsatplay-math "~0.0.25"
+    browserfs "^1.4.3"
+    bson-objectid "~2.0.3"
+    gpujsutils "~1.0.12"
+    webgl-plot-utils "~0.2.7"
+
+graphscript-services@~0.1.51:
+  version "0.1.51"
+  resolved "https://registry.yarnpkg.com/graphscript-services/-/graphscript-services-0.1.51.tgz#3b833fa243c202444d9e773b1fd53751f525ac9e"
+  integrity sha512-Axa/WHLi28oXAi731i/CWZD0hj7fL2GaeLIaHF/QHczqeE0hhUOUZbD2e5sY0MYgR8UYjX3s06w6vyo2Us1vhg==
+  dependencies:
+    brainsatplay-math "~0.0.25"
+    browserfs "^1.4.3"
+    bson-objectid "~2.0.3"
+    gpujsutils "~1.0.12"
+    webgl-plot-utils "~0.2.7"
+
 graphscript@~0.1.41:
   version "0.1.41"
   resolved "https://registry.yarnpkg.com/graphscript/-/graphscript-0.1.41.tgz#c1bc70fc17db464d79e432b414f19d3d08a75923"
@@ -60,6 +139,11 @@ graphscript@~0.1.41:
     bson-objectid "~2.0.3"
     web-worker "~1.2.0"
     ws "~8.8.1"
+
+lodash@^4.17.14:
+  version "4.17.21"
+  resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.21.tgz#679591c564c3bffaae8454cf0b3df370c3d6911c"
+  integrity sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==
 
 node-domexception@^1.0.0:
   version "1.0.0"
@@ -75,6 +159,16 @@ node-fetch@^3.2.10:
     fetch-blob "^3.1.4"
     formdata-polyfill "^4.0.10"
 
+pako@^1.0.4:
+  version "1.0.11"
+  resolved "https://registry.yarnpkg.com/pako/-/pako-1.0.11.tgz#6c9599d340d54dfd3946380252a35705a6b992bf"
+  integrity sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==
+
+throat@^6.0.1:
+  version "6.0.1"
+  resolved "https://registry.yarnpkg.com/throat/-/throat-6.0.1.tgz#d514fedad95740c12c2d7fc70ea863eb51ade375"
+  integrity sha512-8hmiGIJMDlwjg7dlJ4yKGLK8EsYqKgPWbG3b4wjJddKNwc7N7Dpn08Df4szr/sZdMVeOstrdYSsqzX6BYbcB+w==
+
 web-streams-polyfill@^3.0.3:
   version "3.2.1"
   resolved "https://registry.yarnpkg.com/web-streams-polyfill/-/web-streams-polyfill-3.2.1.tgz#71c2718c52b45fd49dbeee88634b3a60ceab42a6"
@@ -84,6 +178,18 @@ web-worker@~1.2.0:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/web-worker/-/web-worker-1.2.0.tgz#5d85a04a7fbc1e7db58f66595d7a3ac7c9c180da"
   integrity sha512-PgF341avzqyx60neE9DD+XS26MMNMoUQRz9NOZwW32nPQrF6p77f1htcnjBSEV8BGMKZ16choqUG4hyI0Hx7mA==
+
+webgl-plot-utils@~0.2.7:
+  version "0.2.7"
+  resolved "https://registry.yarnpkg.com/webgl-plot-utils/-/webgl-plot-utils-0.2.7.tgz#f1230e3211a40d6b55fb088d9b7fb8c142d39d67"
+  integrity sha512-Fi6QNWeBivFlDU45sT/3HmDwrdbajpYqm/8OL7tgiH5e1zamnbZt2b6LspE2vuyOBJkV3nkfik/Yfoz9W6JUPQ==
+  dependencies:
+    webgl-plot "~0.7.0"
+
+webgl-plot@~0.7.0:
+  version "0.7.0"
+  resolved "https://registry.yarnpkg.com/webgl-plot/-/webgl-plot-0.7.0.tgz#7be002ab5069f04661fc356e7bbde82d2a444cb4"
+  integrity sha512-/prs3XMFKlXcov3qvx3LxqMws0Dg68kmmHmO82Qm6FFGpeKME7c3nuVqSe9CG47BvG9mGVPxDMjRc0DP/jTc2A==
 
 ws@~8.8.1:
   version "8.8.1"

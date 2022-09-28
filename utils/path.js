@@ -1,3 +1,6 @@
+import * as mimeTypes from './mimeTypes.js'
+import * as nodeModules from './nodeModules.js'
+
 const urlSep = '://'
 
 export const get = (path, rel = '', keepRelativeImports=false, isDirectory = false) => {
@@ -48,3 +51,33 @@ export const get = (path, rel = '', keepRelativeImports=false, isDirectory = fal
     if (prefix) return prefix + '://' + newPath
     else return newPath
 }
+
+
+export function absolute(uri) {
+    const absolutePath = uri[0] !== ".";
+    const isRemote = url(uri);
+    return absolutePath && !isRemote
+}
+
+export function url(uri) {
+    try {
+        new URL(uri)
+        return true
+    } catch {
+        return false
+    }
+}
+
+export const extension = (path) => {
+    const ext = path.split('/').slice(-1)[0].split(".").slice(-1)[0];
+    if (mimeTypes.map[ext]) return ext
+}
+
+export const noBase = (path, opts) => {
+    const absolutePath = absolute(path)
+    const rootRelativeTo = opts.rootRelativeTo ?? nodeModules.defaults.rootRelativeTo
+    const noLocalPath = (globalThis.location) ? path.replace(`${globalThis.location.origin}/`, "") : path
+    const noBase = absolutePath ? noLocalPath : noLocalPath.replace(`${rootRelativeTo.split("/").slice(0, -1).join("/")}/`, "");
+    return noBase
+}
+
