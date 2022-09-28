@@ -7,18 +7,20 @@ export const getURL = (path) => {
     return url
 }
 
-export const handleFetch = async (path, options={}, progressCallback) => {
+export const handleFetch = async (path, options={}) => {
     if (!options.mode)  options.mode = 'cors' // Auto-CORS Support
     const url = getURL(path) 
 
-    const response = await fetchRemote(url, options, progressCallback)
-    if (!response) throw new Error('No response received.')
-    const type = response.type.split(';')[0] // Get mimeType (not fully specified)
+    const progressCallback = options?.callbacks?.progress?.fetch
+
+    const info = await fetchRemote(url, options, progressCallback)
+    if (!info.buffer) throw new Error('No response received.')
+    const type = info.type.split(';')[0] // Get mimeType (not fully specified)
 
     return {
+        ...info,
         url,
         type,
-        buffer: response.buffer
     }
 }
 
@@ -26,7 +28,7 @@ export const fetchRemote = async (url, options={}, progressCallback) => {
 
     const response = await globalThis.fetch(url, options)
 
-    return new Promise(async resolve => {
+    const info = await new Promise(async resolve => {
 
         if (response) {
 
@@ -55,6 +57,8 @@ export const fetchRemote = async (url, options={}, progressCallback) => {
                         const blob = new Blob(buffer, config)
                         const ab = await blob.arrayBuffer()
                         resolve({buffer: new Uint8Array(ab), type})
+                        if (progressCallback instanceof Function) progressCallback(url, bytesReceived, bytes, done, response.headers.get('Range')) // Send Done
+
                         return;
                     }
 
@@ -62,7 +66,7 @@ export const fetchRemote = async (url, options={}, progressCallback) => {
                     const chunk = value;
                     buffer.push(chunk);
 
-                    if (progressCallback instanceof Function) progressCallback(response.headers.get('Range'), bytesReceived / bytes, bytes)
+                    if (progressCallback instanceof Function) progressCallback(url, bytesReceived, bytes, response.headers.get('Range'))
 
                     // Read some more, and call this function again
                     return reader.read().then(processBuffer)
@@ -76,4 +80,9 @@ export const fetchRemote = async (url, options={}, progressCallback) => {
             resolve(undefined)
         }
     })
+
+    return {
+        response,
+        ...info
+    }
 }

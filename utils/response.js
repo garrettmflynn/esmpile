@@ -1,33 +1,28 @@
 import * as encode from "./encode/index.js";
-import * as pathUtils from "./path.js";
-import * as load from "./load.js";
 import * as transformations from './transformations.js'
 import * as handlers from './handlers.js'
-import * as mimeTypes from './mimeTypes.js'
-import * as compile from './compile.js'
+import * as pathUtils from "./path.js";
+import * as mimeTypes from "./mimeTypes.js";
+import * as compile from "./compile.js";
+import { handleFetch } from "./request.js";
 
-const catchFailedModule = async (uri, e) => {
-    if (
-        e.message.includes('The string to be encoded contains characters outside of the Latin1 range.') // cannot be represented as a datauri
-        || e.message.includes('Cannot set properties of undefined') // will not appropriately load to the window
-    ) return await load.script(uri)
-    else throw e
-}
 
 // Get ESM Module Info
 const enc = new TextDecoder("utf-8");
-export const get = async (uri, expectedType) => {
+export const get = async (uri, opts, expectedType) => {
 
-    const response = await globalThis.fetch(uri)
-    const info = { uri, response, text: '', buffer: null }
+    const fetchInfo = await handleFetch(uri, opts)
+    const response = fetchInfo.response
+
+    const info = { uri, response, text: {original: '', updated: ''}, buffer: null }
     if (response.ok) {
         if (expectedType) {
             const mimeType = response.headers.get("Content-Type")
             if (!mimeType.includes(expectedType)) throw new Error(`Expected Content Type ${expectedType} but received ${mimeType} for  ${uri}`)
         }
 
-        info.buffer = await response.arrayBuffer()
-        info.text = enc.decode(info.buffer)
+        info.buffer = fetchInfo.buffer
+        info.text.original = info.text.updated = enc.decode(info.buffer)
     } else {
         throw new Error(response.statusText)
     }
@@ -42,48 +37,45 @@ export const safe = async (uri, opts) => {
     // Try Alternative File Paths
     const transArray = transformations.get(uri)
 
-    if (transArray.length > 0) {
+    let info;
 
-        let info;
+    if (transArray.length > 0) {
         do {
             const ext = transArray.shift()
 
             const name = ext?.name ?? ext
             const warning = (e) => {
                 console.error(`Import using ${name ?? ext} transformation failed for ${uri}`)
-                // if (e) console.error(e)
             }
 
             const transformed = await handlers.transformation(uri, ext, opts)
 
             const expectedType = (ext) ? null : 'application/javascript'
-            info = await get(transformed, expectedType).then(res => {
-                console.warn(`Import using ${name ?? ext} transformation succeeded for ${uri}`)
+            info = await get(transformed, opts, expectedType).then(res => {
+                if (opts.debug) console.warn(`Import using ${name ?? ext} transformation succeeded for ${uri}`)
                 return res
             }).catch(warning)
         } while (!info && transArray.length > 0)
 
         if (!info) throw new Error(`No valid transformation found for ${uri}`)
-        else return info
     }
 
     // Get Specified URI Directly
-    else return await get(uri);
+    else info = await get(uri, opts);
+
+    info.originalURI = uri
+    return info
 }
 
 
 // Direct Import of ES6 Modules
-export const parse = async (info, type = "buffer") => {
-    const pathExt = pathUtils.extension(info.uri)
-    const isJSON = pathExt === 'json'
-    let mimeType = mimeTypes.get(pathExt)
-    let datauri = null;
-    let module = null;
-    let objecturl = null
+export const parse = async (info, type="buffer") => {
 
-    let bufferOrText = info[type]
+    let bufferOrText = (type === 'text') ? info.text.updated :  info.buffer 
 
     // Compile Code
+    const pathExt = pathUtils.extension(info.uri)
+    let mimeType = mimeTypes.get(pathExt)
     switch (mimeType) {
         case 'text/typescript':
             bufferOrText = compile.typescript(info, type)
@@ -91,35 +83,15 @@ export const parse = async (info, type = "buffer") => {
             break;
     }
 
-    // Import DataURI 
-    const importURI = async (uri) => await (isJSON ? import(uri, { assert: { type: "json" } }) : import(uri)).catch((e) => {
-        throw e
-    });
-
-    try {
-        datauri = encode.datauri.get(bufferOrText, mimeType, type);
-        module = await importURI(datauri).catch((e) => {
-            throw e
-        });
-    }
-
-    // Handle Exceptions
-    catch (e) {
-        datauri = encode.datauri.get(bufferOrText, mimeType, type, true);
-        if (mimeTypes.isJS(mimeType)) module = datauri = await catchFailedModule(datauri, e).catch((e) => {
-            // console.error('Failed to load module', path, info, e)
-            throw e
-        }); // javascript script tag imports
-        else module = datauri // audio / video assets
-    }
+    // Get Data URI
+    const datauriInfo = await encode.datauri.get(bufferOrText, info.uri, mimeType)
 
     // Get Object URL
-    objecturl = encode.objecturl.get(bufferOrText) // save
+    const objecturl = encode.objecturl.get(bufferOrText)
 
-    return {
-        uri: info.uri,
-        module,
-        datauri,
-        objecturl
-    }
+    info.module = datauriInfo.module
+    info.datauri = datauriInfo.datauri
+    info.objecturl = objecturl
+
+    return info
 }

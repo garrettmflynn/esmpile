@@ -8,23 +8,31 @@ import * as errors from './utils/errors.js'
 import * as response from './utils/response.js'
 
 
-globalThis.REMOTEESM_BUNDLES = {} // Share references between loaded dataurl instances
-const bundleInfo = {} // All information saved
+globalThis.REMOTEESM_BUNDLES = {global: {}} // Share references between loaded dataurl instances
 
 // Import ES6 Modules (and replace their imports with actual file imports!)
 const re = /[^\n]*(?<![\/\/])import\s+([ \n\t]*(?:(?:\* (?:as .+))|(?:[^ \n\t\{\}]+[ \n\t]*,?)|(?:[ \n\t]*\{(?:[ \n\t]*[^ \n\t"'\{\}]+[ \n\t]*,?)+\}))[ \n\t]*)from[ \n\t]*(['"])([^'"\n]+)(?:['"])([ \n\t]*assert[ \n\t]*{type:[ \n\t]*(['"])([^'"\n]+)(?:['"])})?/gm;
 
 export const resolve = pathUtils.get
 
-const setBundle = (info, opts, bundles) => {
+const global = globalThis.REMOTEESM_BUNDLES.global
+const setBundle = (info, opts) => {
+    const bundleInfo = getBundle(opts.bundle)
+    const bundles = bundleInfo.bundle
+
     const options = [info.datauri, info.objecturl]
-    bundles[info.uri] = (opts.bundle === 'datauri') ? options[0] ?? options[1] : options[1] ?? options[0]
+    if (!bundles[info.uri]) bundles[info.uri] = createBundle()
+
+    // Register In Global
+    if (!global[info.uri]) global[info.uri] = bundles[info.uri]
+    else {
+        if (opts.bundle != 'global' && opts.debug) console.warn('Duplicating this import. Already tracking globally...', info.uri)
+    }
+
+    global[info.uri].value = bundles[info.uri].value = (opts.bundler === 'objecturl') ? options[1] ?? options[0] : options[0] ?? options[1]
 }
 
 const internal = async (info, importInfo, opts) => {
-
-    const bundleInfo = getBundle(opts.bundle) // must have a bundle
-    const bundles = bundleInfo.bundle
 
     const { variables, wildcard } = importInfo;
     let path = importInfo.path
@@ -37,73 +45,87 @@ const internal = async (info, importInfo, opts) => {
 
         let correctPath = (absolutePath) ? path : pathUtils.get(path, info.uri);
 
+        // Correct the Correct Path
         const absNode = nodeModules.path(opts)
         correctPath = correctPath.replace(`${absNode}/`, '')
 
-        const dependentFilePath = pathUtils.get(correctPath);
-        const dependentFileWithoutRoot = pathUtils.noBase(dependentFilePath, opts);
+        // Set Bundle Key
+        const noRoot = pathUtils.noBase(correctPath, opts);
+        const bundleKey = noRoot
 
-        const bundleKey = dependentFileWithoutRoot
-        if (opts.dependencies) opts.dependencies[info.uri][bundleKey] = importInfo;
+        // Check If Bundle Already Exists
+        const bundleInfo = getBundle(opts.bundle, bundleKey) // must have a bundle
 
-        
-        // Check If Already Exists
-        let ref = bundles[bundleKey];
-
-        if (ref === null) {
-            console.warn(`Circular dependency detected: ${info.uri} -> ${dependentFilePath}.`)
-            // const res = await import(globalThis.REMOTEESM_BUNDLE[bundleInfo.bundle][bundleKey])
-        } 
+        const thisBundle = bundleInfo.bundle
+        let ref = thisBundle.value;
         
         if (!ref) {
-            bundles[bundleKey] = null
+            thisBundle.value = null
+
+            let foundCircular = false
+
+            const dependencyBundle = getBundle(opts.bundle, info.uri) // must have a bundle
+
+            if (dependencyBundle.bundle.dependents.has(bundleKey)) foundCircular = true
+            dependencyBundle.bundle.dependencies.add(bundleKey)
+            
+            if (thisBundle.dependencies.has(info.uri)) foundCircular = true 
+            thisBundle.dependents.add(info.uri)
+
+
             const url = getURL(correctPath);
-            const newURI = dependentFileWithoutRoot;
+            const newURI = noRoot;
 
             // Import JavaScript and TypeScript Safely
-
             const newOptions = {
                 output: {},
                 ...opts,
                 root: url,
-                datauri: bundles
             }
 
             newOptions.output.text = true // always output text
 
+
+            // Abort for circular references
+            if(foundCircular) {
+                const message = `Circular dependency detected: ${info.uri} <-> ${bundleKey}.`
+                throw new Error(message)
+            }
+
+            // Get File Info
             imported = await getInfo(newURI, newOptions, {
                 original: path,
                 transformed: correctPath
-            }).catch(e => {
-                console.log(e)
-                throw e
             })
 
-
-            if (imported.fallback) bundles[bundleKey] = imported.module;
+            if (opts.dependencies) {
+                if (!opts.dependencies[info.uri]) opts.dependencies[info.uri] = {}
+                opts.dependencies[info.uri][imported.uri] = importInfo;
+            }
+              
+            if (imported.fallback) thisBundle.value = imported.module;
             else {
                 const innerInfo = await response.parse({
                     text: imported.text,
                     uri: bundleKey
                 }, "text")
 
-                setBundle(innerInfo, opts, bundles)
+                setBundle(innerInfo, opts)
             }
         }
 
 
         // Update Original Input TextS
-        console.log('Bundle', bundles[bundleKey])
-        if (typeof bundles[bundleKey] === "string") {
-            info.text = `import ${wildcard ? "* as " : ""}${variables} from "${bundles[bundleKey]}"; // Imported from ${bundleKey}
-                  ${info.text}`;
+        const value = thisBundle.value
+        if (typeof value === "string") {
+            info.text.updated = `import ${wildcard ? "* as " : ""}${variables} from "${value}"; // Imported from ${bundleKey}
+                  ${info.text.updated}`;
         }
 
         // Passed by Reference (e.g. fallbacks)
         else {
-            console.log('What Is This?')
-            text =  `const ${variables} = globalThis.REMOTEESM_BUNDLE["${bundleInfo.bundle}"]["${bundleKey}"];
-            ${text}`;
+            info.text.updated =  `const ${variables} = globalThis.REMOTEESM_BUNDLE["${bundleInfo.id}"]["${bundleKey}"];
+            ${info.text.updated}`;
         }
 
         return imported
@@ -148,18 +170,36 @@ export const getInfo = async (uri, opts, pathInfo = {
     })
 }
 
-function getBundle(id) {
-    console.log(globalThis.REMOTEESM_BUNDLES[id])
+function createBundle() {
+    return {
+        value: undefined,
+        dependencies: new Set(),
+        dependents: new Set()
+    }
+}
+
+function getBundle(id, key) {
     if (!id) id = Math.random()
-    if (!globalThis.REMOTEESM_BUNDLES[id]) globalThis.REMOTEESM_BUNDLES[id] = {}
+    
+    let bundle = globalThis.REMOTEESM_BUNDLES[id]
+    if (!bundle) bundle = globalThis.REMOTEESM_BUNDLES[id] = {}
+
+    if (key) {
+        if (!bundle[key]) bundle[key] = createBundle()
+        bundle = bundle[key] // move
+    }
+
     return {
         id,
-        bundle: globalThis.REMOTEESM_BUNDLES[id]
+        bundle
     }
 }
 
 // ------------- Safely Import Module -------------
 export const safe = async (uri, opts = {}) => {
+
+    opts = Object.assign({}, opts) // copy options
+
     const {
         onImport = () => { },
         output = {},
@@ -167,35 +207,40 @@ export const safe = async (uri, opts = {}) => {
     } = opts;
     
 
-    const bundleInfo = getBundle(opts.bundle)
-    opts.bundle = bundleInfo.id
-    const bundles = bundleInfo.bundle
+    // Set Bundle ID
+    if (!opts.bundle) {
+        const bundleInfo = getBundle(opts.bundle)
+        opts.bundle = bundleInfo.id // use same 
+    }
 
+    // Set Bundler
+    if (!opts.bundler) opts.bundler = 'objecturl' // default bundler
+
+    // Initialize
     await polyfills.ready // Make sure fetch is ready
-    if (opts.dependencies) opts.dependencies[uri] = {}; // Register in tree
 
     let finalInfo = {};
     const pathExt = pathUtils.extension(uri)
 
     const isJSON = pathExt === "json";
 
+    // Try to Import Natively
     finalInfo.module = (!forceImportFromText) ?
         await (isJSON ? import(uri, { assert: { type: "json" } }) : import(uri))
-            .catch(() => { }) // is available locally?
+            .catch(() => { })
         : undefined;
 
-    let originalText, info;
+    let info;
     if (!finalInfo.module || output.text || output.datauri) {
 
         // ------------------- Get URI Response -------------------
         info = await response.safe(uri, opts)
-        originalText = info.text;
 
         // ------------------- Try Direct Import -------------------
         try {
 
             finalInfo = await response.parse(info)
-            setBundle(finalInfo, opts, bundles)
+            setBundle(finalInfo, opts)
         }
 
         // ------------------- Replace Nested Imports -------------------
@@ -204,9 +249,9 @@ export const safe = async (uri, opts = {}) => {
             // ------------------- Get Import Details -------------------
             const importInfo = [];
 
-            const matches = Array.from(info.text.matchAll(re))
+            const matches = Array.from(info.text.updated.matchAll(re))
             matches.forEach(m => {
-                info.text = info.text.replace(m[0], ``); // Replace found text
+                info.text.updated = info.text.updated.replace(m[0], ``); // Replace found text
                 const wildcard = !!m[1].match(/\*\s+as/);
                 const variables = m[1].replace(/\*\s+as/, "").trim();
                 importInfo.push({
@@ -216,28 +261,22 @@ export const safe = async (uri, opts = {}) => {
                 });
             })
 
-            console.warn('Got More Imports', uri, importInfo)
-
             // ------------------- Import Files Asynchronously -------------------
             const promises = importInfo.map(async (thisImport) => {
                 await internal(info, thisImport, opts) // can't stop all the requests in midflight...
             })
 
-            await Promise.all(promises)
+            await Promise.allSettled(promises)
 
             // ------------------- Import Updated File Text -------------------
             finalInfo = await response.parse(info, "text")
-            setBundle(finalInfo, opts, bundles)
+            setBundle(finalInfo, opts)
         }
     }
 
 
     // ------------------- Pass Additional Information to the User -------------------
-    onImport(uri, {
-        ...finalInfo,
-        text: info?.text,
-        file: originalText,
-    });
+    onImport(uri, finalInfo);
 
 
     // ------------------- Return Standard Import Value -------------------

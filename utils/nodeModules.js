@@ -35,9 +35,7 @@ const getPath = (str, path, base) => pathUtils.get(str, base, false, path.split(
 const getPackagePath = (path, base = path) => getPath("package.json", path, base)
 
 export const getMainPath = async (path, base = path) => {
-    const pkg = await getPackage(path, base).catch(e => {
-        throw e
-    })
+    const pkg = await getPackage(path, base)
     if (!pkg) return base
     const destination = pkg.module || pkg.main || "index.js";
     return getPath(destination, path, base);

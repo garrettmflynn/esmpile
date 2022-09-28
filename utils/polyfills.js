@@ -2,7 +2,7 @@
 export const ready = new Promise(async (resolve, reject) => {
     try {
         if (typeof process === 'object') { //indicates node
-            // globalThis.REMOTEESM_NODE = true
+            globalThis.REMOTEESM_NODE = true
             globalThis.fetch = (await import('node-fetch')).default
             if (typeof globalThis.fetch !== 'function') globalThis.fetch = fetch
 

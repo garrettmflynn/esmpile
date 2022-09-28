@@ -76,8 +76,18 @@ export const extension = (path) => {
 export const noBase = (path, opts) => {
     const absolutePath = absolute(path)
     const rootRelativeTo = opts.rootRelativeTo ?? nodeModules.defaults.rootRelativeTo
+    const nodeModulePath = opts.nodeModules ?? nodeModules.defaults.nodeModules
+
     const noLocalPath = (globalThis.location) ? path.replace(`${globalThis.location.origin}/`, "") : path
-    const noBase = absolutePath ? noLocalPath : noLocalPath.replace(`${rootRelativeTo.split("/").slice(0, -1).join("/")}/`, "");
-    return noBase
+    
+    // Pass Absolute
+    if (absolutePath) return noLocalPath
+
+    // Keep Relative
+    else {
+        let noBase = noLocalPath.replace(`${nodeModulePath}/`, "").replace(`${rootRelativeTo.split("/").slice(0, -1).join("/")}/`, "");
+        if (noBase[0] !== '.') noBase = `./${noBase}`
+        return noBase
+    }
 }
 
