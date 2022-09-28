@@ -75,7 +75,7 @@
     // ---------------- Declare Utilities ----------------
     const ul = document.body.querySelector('ul')
     const importRemoteESM = async (path, options, opts) => {
-        const res = await remoteESM.safe(path, options).catch(e => console.error('Failed', e));
+        const res = await remoteESM.safe(path, options);
         console.log(`---------------- ${opts.label} ----------------`)
         console.log(path, res)
         ul.insertAdjacentHTML('beforeend', `<li>${res ? 'Got' : 'Failed to get'} ${path}</li>`);
