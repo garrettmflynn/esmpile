@@ -1,7 +1,7 @@
 {
   "name": "esmpile",
   "version": "0.0.1",
-  "description": "Compile ESM on the browser",
+  "description": "Compile ESM source files on the browser",
   "main": "index.js",
   "author": "Garrett Flynn <garrettmflynn@gmail.com>",
   "license": "AGPL-3.0-or-later",
