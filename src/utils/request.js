@@ -2,18 +2,21 @@ import * as pathUtils from "./path.js"
 
 export const getURL = (path) => {
     let url
-    try { url = new URL(path).href } 
+    try { url = new URL(path).href }
     catch { url = pathUtils.get(path, globalThis.location.href) }
     return url
 }
 
-export const handleFetch = async (path, options={}) => {
-    if (!options.mode)  options.mode = 'cors' // Auto-CORS Support
-    const url = getURL(path) 
+export const handleFetch = async (path, options = {}) => {
+    if (!options.mode) options.mode = 'cors' // Auto-CORS Support
+    const url = getURL(path)
 
     const progressCallback = options?.callbacks?.progress?.fetch
 
-    const info = await fetchRemote(url, options, progressCallback)
+    const info = await fetchRemote(url, options, {
+        path,
+        progress: progressCallback
+    })
     if (!info.buffer) throw new Error('No response received.')
     const type = info.type.split(';')[0] // Get mimeType (not fully specified)
 
@@ -24,30 +27,35 @@ export const handleFetch = async (path, options={}) => {
     }
 }
 
-export const fetchRemote = async (url, options={}, progressCallback) => {
+export const fetchRemote = async (url, options = {}, additionalArgs) => {
+
+    const path = additionalArgs.path ?? url
+    const pathId = pathUtils.get(pathUtils.noBase(path, options))
 
     const response = await globalThis.fetch(url, options)
+
+    let bytesReceived = 0
+    let buffer = [];
+    let bytes = 0;
 
     const info = await new Promise(async resolve => {
 
         if (response) {
 
+
+            bytes = parseInt(response.headers.get('Content-Length'), 10)
             const type = response.headers.get('Content-Type')
 
             // Browser Remote Parser
             if (globalThis.REMOTEESM_NODE) {
                 const buffer = await response.arrayBuffer()
-                resolve({buffer, type})
+                resolve({ buffer, type })
             }
-            
+
             // Browser Remote Parser
             else {
 
                 const reader = response.body.getReader();
-
-                const bytes = parseInt(response.headers.get('Content-Length'), 10)
-                let bytesReceived = 0
-                let buffer = [];
 
                 const processBuffer = async ({ done, value }) => {
 
@@ -56,9 +64,7 @@ export const fetchRemote = async (url, options={}, progressCallback) => {
                         if (typeof type === 'string') config.type = type
                         const blob = new Blob(buffer, config)
                         const ab = await blob.arrayBuffer()
-                        resolve({buffer: new Uint8Array(ab), type})
-                        if (progressCallback instanceof Function) progressCallback(url, bytesReceived, bytes, done, response.headers.get('Range')) // Send Done
-
+                        resolve({ buffer: new Uint8Array(ab), type })
                         return;
                     }
 
@@ -66,7 +72,7 @@ export const fetchRemote = async (url, options={}, progressCallback) => {
                     const chunk = value;
                     buffer.push(chunk);
 
-                    if (progressCallback instanceof Function) progressCallback(url, bytesReceived, bytes, response.headers.get('Range'))
+                    if (additionalArgs.progress instanceof Function) additionalArgs.progress(pathId, bytesReceived, bytes, null, null, response.headers.get('Range'))
 
                     // Read some more, and call this function again
                     return reader.read().then(processBuffer)
@@ -80,6 +86,14 @@ export const fetchRemote = async (url, options={}, progressCallback) => {
             resolve(undefined)
         }
     })
+
+    if (additionalArgs.progress instanceof Function) {
+        const status = [null, null]
+        if (response.ok) status[0] = true
+        else status[1] = true
+        additionalArgs.progress(pathId, bytesReceived, bytes, ...status, response.headers.get('Range')) // Send Done
+    }
+
 
     return {
         response,

@@ -2,13 +2,13 @@ import * as pathUtils from './path.js'
 
 export const defaults = {
     nodeModules: "node_modules",
-    rootRelativeTo: "./"
+    relativeTo: "./"
 };
 
 export const path = (opts) => {
     const nodeModules = opts.nodeModules ?? defaults.nodeModules;
-    const rootRelativeTo = opts.rootRelativeTo ?? defaults.rootRelativeTo;
-    return pathUtils.get(nodeModules, rootRelativeTo)
+    const relativeTo = opts.relativeTo ?? defaults.relativeTo;
+    return pathUtils.get(nodeModules, relativeTo)
 }
 
 export const resolve = async (uri, opts) => {
@@ -25,7 +25,7 @@ export const resolve = async (uri, opts) => {
     }
 
 
-    return await getMainPath(uri, base).catch(e => {
+    return await getMainPath(uri, base, opts).catch(e => {
         console.warn(`${base} does not exist or is not at the root of the project.`);
     })
 };
@@ -34,17 +34,19 @@ const getPath = (str, path, base) => pathUtils.get(str, base, false, path.split(
 
 const getPackagePath = (path, base = path) => getPath("package.json", path, base)
 
-export const getMainPath = async (path, base = path) => {
-    const pkg = await getPackage(path, base)
+export const getMainPath = async (path, base = path, opts={}) => {
+    const pkg = await getPackage(path, base, opts)
     if (!pkg) return base
     const destination = pkg.module || pkg.main || "index.js";
     return getPath(destination, path, base);
 }
 
-const getPackage = async (path, base = path) => {
+const getPackage = async (path, base = path, opts) => {
     const pkgPath = getPackagePath(path, base)
     const isURL = pathUtils.url(pkgPath)
     const correct = isURL ? pkgPath : new URL(pkgPath, window.location.href).href
+        // const correct = isURL ? pkgPath : pathUtils.get(pkgPath, opts)
+
     return (await import(correct, { assert: { type: "json" } })).default;
 }
 

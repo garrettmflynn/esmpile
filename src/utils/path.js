@@ -5,6 +5,7 @@ const urlSep = '://'
 
 export const get = (path, rel = '', keepRelativeImports=false, isDirectory = false) => {
 
+    if (url(path)) return path
     // if (!path.includes('./')) rel = '' // absolute
 
     let prefix = ''
@@ -53,10 +54,10 @@ export const get = (path, rel = '', keepRelativeImports=false, isDirectory = fal
 }
 
 
-export function absolute(uri) {
+export function absolute(uri, urlWorks) {
     const absolutePath = uri[0] !== ".";
     const isRemote = url(uri);
-    return absolutePath && !isRemote
+    return absolutePath && (urlWorks || !isRemote)
 }
 
 export function url(uri) {
@@ -78,9 +79,9 @@ export const extension = (path) => {
 export const base = (str) => str.substring(0, str.lastIndexOf("/"));
 
 
-export const noBase = (path, opts) => {
-    const absolutePath = absolute(path)
-    const rootRelativeTo = opts.rootRelativeTo ?? nodeModules.defaults.rootRelativeTo
+export const noBase = (path, opts, removeNode) => {
+    const absolutePath = absolute(path, true)
+    const relativeTo = opts.relativeTo ?? nodeModules.defaults.relativeTo
     const nodeModulePath = opts.nodeModules ?? nodeModules.defaults.nodeModules
 
     const noLocalPath = (globalThis.location) ? path.replace(`${base(globalThis.location.href)}/`, "") : path
@@ -90,7 +91,9 @@ export const noBase = (path, opts) => {
 
     // Keep Relative
     else {
-        let noBase = noLocalPath.replace(`${nodeModulePath}/`, "").replace(`${rootRelativeTo.split("/").slice(0, -1).join("/")}/`, "");
+        let noBase = noLocalPath
+        if (removeNode) noBase = noBase.replace(`${nodeModulePath}/`, "")
+        noBase = noBase.replace(`${relativeTo.split("/").slice(0, -1).join("/")}/`, "");
         if (noBase[0] !== '.') noBase = `./${noBase}`
         return noBase
     }

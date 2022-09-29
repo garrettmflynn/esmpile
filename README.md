@@ -8,12 +8,47 @@ This library allows for you to **compile ESM source files** using standard impor
 
 > **Note:** **esmpile** is a core library of the [Brains@Play Framework](https://github.com/brainsatplay/brainsatplay/README.md)
  
- This project can be extended by [es-monitor](https://github.com/garrettmflynn/es-monitor) to visualize the ESM code of an application.
+This project can be extended by [es-monitor](https://github.com/garrettmflynn/es-monitor) to visualize the ESM code of an application.
 
- ## Additional Features
- Include a `dependencies` key in the `options` object to extract a list of dependencies for each file.
+## Options
+- **bundle:** Specify the bundle to draw from
 
- ## Acknowledgments
+    - **'global':** Draw from the global registry
+    
+    - **undefined:** Create a new bundle with a random key
+
+    - **any key:** Specify the bundle name
+
+- **bundler:** Specify how to bundle
+
+    - **datauri:** A saveable file with a full specification of the dependencies
+
+    - **objecturl:** A runtime-only file that points to dependencies in memory
+
+- **callbacks:** A set of callbacks used by the API
+
+    -  **progress:** Progress updates on file compilation
+
+        -  **fetch:** Fetch-level updates for each file
+
+        -  **file:** File-level updates for each dependency resolution
+
+- **debug:** A boolean that toggles debug messages in the Developer Console 
+
+- **dependencies:** Extract a list of dependencies for each file using an empty object
+
+- **onImport:** A callback for accumulating non-ESM bundle information (e.g. raw and compiled text, objecturl, datauri, etc.)
+
+- **output:** Specify which information to output to the user
+    - **text:** Use text for module creation and output using onImport
+
+- **relativeTo:** Specify what file the paths are relative to.
+
+
+## Open Issues
+- **Live Edit Any ES Module:** Allow for minimal recompiling of a single module (and dependents) after submitting updated text.
+
+## Acknowledgments
 This library is maintained by [Garrett Flynn](https://github.com/garrettmflynn) and [Joshua Brewster](https://github.com/joshbrew), who use contract work and community contributions through [Open Collective](https://opencollective.com/brainsatplay) to support themselves.
 
 ### Backers

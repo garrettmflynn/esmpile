@@ -30,39 +30,51 @@ export const get = async (uri, opts, expectedType) => {
     return info
 }
 
+export const find = async(uri, opts, callback) => {
+    
+     // Try Alternative File Paths
+     const transArray = transformations.get(uri)
 
-// Get ESM Module Info (safely)
-export const safe = async (uri, opts) => {
-
-    // Try Alternative File Paths
-    const transArray = transformations.get(uri)
-
-    let info;
-
-    if (transArray.length > 0) {
-        do {
-            const ext = transArray.shift()
-
-            const name = ext?.name ?? ext
-            const warning = (e) => {
-                if (opts.debug) console.error(`Import using ${name ?? ext} transformation failed for ${uri}`)
-            }
-
-            const transformed = await handlers.transformation(uri, ext, opts)
-
-            const expectedType = (ext) ? null : 'application/javascript'
-            info = await get(transformed, opts, expectedType).then(res => {
+     let response;
+ 
+     if (transArray.length > 0) {
+         do {
+             const ext = transArray.shift()
+ 
+             const name = ext?.name ?? ext
+             const warning = (e) => {
+                 if (opts.debug) console.error(`Import using ${name ?? ext} transformation failed for ${uri}`)
+             }
+ 
+             const transformed = await handlers.transformation(uri, ext, opts)
+             const correctURI = pathUtils.get(transformed, opts.relativeTo)
+             const expectedType = (ext) ? null : 'application/javascript'
+             response = await callback(correctURI, opts, expectedType).then(res => {
                 if (opts.debug) console.warn(`Import using ${name ?? ext} transformation succeeded for ${uri}`)
                 return res
             }).catch(warning)
-        } while (!info && transArray.length > 0)
+         } while (!response && transArray.length > 0)
+ 
+         if (!response) throw new Error(`No valid transformation found for ${uri}`)
+     }
+ 
+     // Get Specified URI Directly
+     else response = await callback(pathUtils.get(uri, opts.relativeTo), opts);
 
-        if (!info) throw new Error(`No valid transformation found for ${uri}`)
-    }
+    return response
+}
 
-    // Get Specified URI Directly
-    else info = await get(uri, opts);
 
+export const findModule = async (uri, opts) => {
+    const pathExt = pathUtils.extension(uri)
+    const isJSON = pathExt === "json";
+    const module = await find(uri, opts, async (transformed) => await (isJSON ? import(transformed, { assert: { type: "json" } }) : import(transformed)))
+    return module
+}
+
+// Get ESM Module Info (safely)
+export const findText = async (uri, opts) => {
+    const info = await find(uri, opts, get)
     info.originalURI = uri
     return info
 }
