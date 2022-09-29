@@ -1,6 +1,6 @@
 # esmpile
 [![Npm package version](https://badgen.net/npm/v/esmpile)](https://npmjs.com/package/esmpile)
-[![Npm package monthly downloads](https://badgen.net/npm/dm/esmpile)](https://npmjs.ccom/package/esmpile)
+[![Npm package monthly downloads](https://badgen.net/npm/dm/esmpile)](https://npmjs.com/package/esmpile)
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Discord](https://img.shields.io/badge/community-discord-7289da.svg?sanitize=true)](https://discord.gg/CDxskSh9ZB)
 
@@ -8,9 +8,8 @@ This library allows for you to **compile ESM source files** using standard impor
 
 > **Note:** **esmpile** is a core library of the [Brains@Play Framework](https://github.com/brainsatplay/brainsatplay/README.md)
  
-This project can be extended by [es-monitor](https://github.com/garrettmflynn/es-monitor) to visualize the ESM code of an application.
-
-## Options
+## Getting Started
+## The List of Options
 ```javascript
 const options = {
     bundle: 'global', // Specify the bundle name to draw from
@@ -34,10 +33,23 @@ const options = {
 
 ```
 
+### Available Extensions
+#### TypeScript
+TypeScript support can be enabled by preloading the associated script:
+
+```javascript
+await esm.load.script('./extensions/typescriptServices.min.js');
+```
+
+The extension code has been generated using our [TypeScript Services minifier](https://github.com/joshbrew/typescriptServices.js-minifier) script.
+
 ## Open Issues
 1. **Live Edit Any ES Module:** Allow for minimal recompiling of a single module (and dependents) after submitting updated text.
 
 2. **Allow for Circular Dependencies:** Currently we are aborting an infinite loop. Try importing './src/index.js' from text for an example.
+
+3. **Visualize Code Execution**: This project could be extended by [es-monitor](https://github.com/garrettmflynn/es-monitor) to visualize the ESM code execution of an application.
+
 
 ## Acknowledgments
 This library is maintained by [Garrett Flynn](https://github.com/garrettmflynn) and [Joshua Brewster](https://github.com/joshbrew), who use contract work and community contributions through [Open Collective](https://opencollective.com/brainsatplay) to support themselves.
