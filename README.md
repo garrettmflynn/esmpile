@@ -1,19 +1,17 @@
-# remote-esm
-[![Npm package version](https://badgen.net/npm/v/remote-esm)](https://npmjs.com/package/remote-esm)
-[![Npm package monthly downloads](https://badgen.net/npm/dm/remote-esm)](https://npmjs.ccom/package/remote-esm)
+# esmpile
+[![Npm package version](https://badgen.net/npm/v/esmpile)](https://npmjs.com/package/esmpile)
+[![Npm package monthly downloads](https://badgen.net/npm/dm/esmpile)](https://npmjs.ccom/package/esmpile)
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Discord](https://img.shields.io/badge/community-discord-7289da.svg?sanitize=true)](https://discord.gg/CDxskSh9ZB)
 
  In addition to standard ESM import features, this library allows for you to **import ESM text files** from any endpoint. For instance, you can load https://raw.githubusercontent.com/garrettmflynn/phaser/main/src/index.js!
 
-> **Note:** **remote-esm** is a core library of the [Brains@Play Framework](https://github.com/brainsatplay/brainsatplay/README.md)
+> **Note:** **esmpile** is a core library of the [Brains@Play Framework](https://github.com/brainsatplay/brainsatplay/README.md)
  
  This project can be extended by [es-monitor](https://github.com/garrettmflynn/es-monitor) to visualize the ESM code of an application.
 
  ## Additional Features
  Include a `dependencies` key in the `options` object to extract a list of dependencies for each file.
-
- Include a `references` key in the `options` object to extract a list of module references.
 
  ## Acknowledgments
 This library is maintained by [Garrett Flynn](https://github.com/garrettmflynn) and [Joshua Brewster](https://github.com/joshbrew), who use contract work and community contributions through [Open Collective](https://opencollective.com/brainsatplay) to support themselves.
