@@ -80,18 +80,19 @@ export const base = (str) => str.substring(0, str.lastIndexOf("/"));
 
 
 export const noBase = (path, opts, removeNode) => {
+
+    path = (globalThis.location) ? path.replace(`${base(globalThis.location.href)}/`, "./") : path
+
     const absolutePath = absolute(path, true)
     const relativeTo = opts.relativeTo ?? nodeModules.defaults.relativeTo
     const nodeModulePath = opts.nodeModules ?? nodeModules.defaults.nodeModules
-
-    const noLocalPath = (globalThis.location) ? path.replace(`${base(globalThis.location.href)}/`, "") : path
     
     // Pass Absolute
-    if (absolutePath) return noLocalPath
+    if (absolutePath) return path
 
     // Keep Relative
     else {
-        let noBase = noLocalPath
+        let noBase = path
         if (removeNode) noBase = noBase.replace(`${nodeModulePath}/`, "")
         noBase = noBase.replace(`${relativeTo.split("/").slice(0, -1).join("/")}/`, "");
         if (noBase[0] !== '.') noBase = `./${noBase}`

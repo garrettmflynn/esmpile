@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>esmpile</title>
+    <title>Remote ESM</title>
     <style>
 
         * {
@@ -21,12 +21,6 @@
             font-family: Arial, Helvetica, sans-serif;
         }
 
-        nav {
-            padding: 20px 35px;
-            background-color: black;
-            color: white;
-        }
-
         i {
             font-size: 80%;
         }
@@ -36,7 +30,7 @@
         }
 
         section {
-            padding: 25px;
+            padding: 50px;
         }
 
         li {
@@ -140,8 +134,9 @@
 </head>
 
 <body>
-    <nav><h1>esmpile</h1></nav>
     <section>
+        <h1>Remote ESM</h1>
+        <i>View the Developer Console for outputs</i>
         <div id="tests"></div>
     </section>
 </body>
@@ -151,8 +146,10 @@
 
     let esm = library
 
+
     // ---------------- Preload the Typescript Service ----------------
     await esm.load.script('./extensions/typescriptServices.js');
+
 
     // ---------------- Set Global Variables ----------------
     const testDiv = document.getElementById('tests')
@@ -195,15 +192,13 @@
             testDiv.appendChild(div)
 
             displays[label] = {
-                name: label,
                 list: ul, 
                 progress: progressCircle, 
                 time, 
                 buttons: {
                     direct: button,
                     text: fromText
-                },
-                entries: {}
+                }
             }
 
         }
@@ -212,43 +207,21 @@
     }
 
     const createEntry = (path, display) => {
-
-        let entry = display.entries[path]
-        
-        if (!entry && display?.list) {
+        if (!entries[path] && display?.list) {
             const li = document.createElement('li')
             const div = document.createElement('div')
-            const name = document.createElement('span')
             const amount = document.createElement('span')
             const status = document.createElement('span')
+            li.innerText = path
             display.list.appendChild(li)
             div.appendChild(status)
             div.appendChild(amount)
-            
-            li.appendChild(name)
             li.appendChild(div)
 
-            entry = display.entries[path] = {
-                li, 
-                name, 
-                amount, 
-                status, 
-                path, 
-                displayName: display.name,
-                reset: () => {
-                    name.innerText = path
-                    status.innerText = ''
-                    amount.innerText = ''
-                }
-            }
-
-            entry.reset()
-
-            if (!entries[path]) entries[path] = []
-            entries[path].push(entry)
+            entries[path] = {li, amount, status}
         }
 
-        return entry
+        return entries[path]
     }
 
     const executable= './tests/index.js'
@@ -260,7 +233,7 @@
     const options = {}
 
     options.relativeTo = import.meta.url // Ensure appropriate relative paths are used
-    options.bundle = null //'global' // Specify which bundle to reference. Specify 'global' to use same bundle across all imports. Don't specify to create a new bundle
+    options.bundle = null//'global' // Specify which bundle to reference. Specify 'global' to use same bundle across all imports. Don't specify to create a new bundle
     options.bundler = 'objecturl' // Specify what sort of link to import with | Can be 'datauri' (saveable) or 'objecturl' (runtime only)
     options.dependencies = {} // Track all file dependencies
     options.debug = false // Show debug messages
@@ -268,15 +241,11 @@
     options.onImport = async (path, info) => {
         const link = info.objecturl ?? info.datauri
 
-        // Add Link to Entry
-        if (link) {
-            if (entries[path]) 
-            entries[path].forEach(entry => {
-                entry.name.innerHTML = `<a href="${info.objecturl}" target="_blank">${path}</a>`
-            }) // Provide a link
-        }
+        console.log(info.original, info.module)
+        // const entry = (!entries[path]) ? createEntry(path) : entries[path]
+        // if (entry) entry.li.innerHTML = `<a href="${info.objecturl}" target="_blank">${path}</a>`
+       
 
-        //---------------- Import Self and Use That as the Core Library ----------------
         if (info.original === selfURI) esm = info.module
 
         // Resolve a Source Map
@@ -345,12 +314,8 @@
 
         let test = tests[label]
         const display = createDisplay(label, test)
-        const entries = display.entries
 
         const onClick = async (override) => {
-
-            // Reset Display
-            for (let name in display.entries) display.entries[name].reset()
 
             display.progress.classList.add('resolving')
 
@@ -389,6 +354,7 @@
             const fullOptions = Object.assign(Object.assign({}, options), override)
 
             const tic = performance.now()
+            display.list.innerHTML = '' // clear the list
             const res = await esm.compile(test.uri, fullOptions).catch(e => {
                 console.error('Failed ESMpilation', e)
                 display.progress.classList.add('failed') // resolution failed

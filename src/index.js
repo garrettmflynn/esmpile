@@ -43,8 +43,6 @@ const bundle = async (info, importInfo, opts) => {
 
     let imported;
 
-    try {
-
         let correctPath = (absolutePath) ? path : pathUtils.get(path, info.uri);
 
         // Correct the Correct Path
@@ -52,28 +50,33 @@ const bundle = async (info, importInfo, opts) => {
         correctPath = correctPath.replace(`${absNode}/`, '')
 
         // Set Bundle Key
-        const noRoot = pathUtils.noBase(correctPath, opts);
-        const bundleKey = noRoot
+        const noRoot = pathUtils.noBase(correctPath, opts); // still is relative
+        const bundleKey = getPathID(correctPath, opts)
+        const uriPathID = getPathID(info.uri, opts)
 
         // Check If Bundle Already Exists
         const bundleInfo = getBundle(opts.bundle, bundleKey) // must have a bundle
 
         const thisBundle = bundleInfo.bundle
         let ref = thisBundle.value;
-        
+
+
+        let foundCircular = false
+        const dependencyBundle = getBundle(opts.bundle, uriPathID) // must have a bundle
+        if (dependencyBundle.bundle.dependents.has(bundleKey)) foundCircular = true
+        dependencyBundle.bundle.dependencies.add(bundleKey)
+        if (thisBundle.dependencies.has(uriPathID)) foundCircular = true 
+        thisBundle.dependents.add(uriPathID)
+
+        // Abort for circular references
+        if(foundCircular) {
+            const message = `Circular dependency detected: ${uriPathID} <-> ${bundleKey}.`
+            throw new Error(message)
+        }
+
+        // Get Bundle Value
         if (!ref) {
             thisBundle.value = null
-
-            let foundCircular = false
-
-            const dependencyBundle = getBundle(opts.bundle, info.uri) // must have a bundle
-
-            if (dependencyBundle.bundle.dependents.has(bundleKey)) foundCircular = true
-            dependencyBundle.bundle.dependencies.add(bundleKey)
-            
-            if (thisBundle.dependencies.has(info.uri)) foundCircular = true 
-            thisBundle.dependents.add(info.uri)
-
 
             const url = getURL(correctPath);
             const newURI = noRoot;
@@ -86,13 +89,6 @@ const bundle = async (info, importInfo, opts) => {
             }
 
             newOptions.output.text = true // always output text
-
-
-            // Abort for circular references
-            if(foundCircular) {
-                const message = `Circular dependency detected: ${info.uri} <-> ${bundleKey}.`
-                throw new Error(message)
-            }
 
             // Get File Info
             imported = await getInfo(newURI, newOptions, {
@@ -131,10 +127,6 @@ const bundle = async (info, importInfo, opts) => {
         }
 
         return imported
-
-    } catch (e) {
-        throw e
-    }
 }
 
 
@@ -149,7 +141,7 @@ export const getInfo = async (uri, opts, pathInfo = {
             ...opts,
             onImport: (path, info) => {
                 if (opts.onImport instanceof Function) opts.onImport(path, info);
-                if (path == uri) resolve(info); // pass all info
+                if (info.original === uri) resolve(info); // pass all info
             }
         }).catch((e) => {
             if (e.message.includes('Circular dependency detected')) reject(e)
@@ -189,6 +181,11 @@ function getBundle(id, key) {
     }
 }
 
+
+function getPathID(path, opts) {
+    return pathUtils.get(pathUtils.noBase(path,opts))
+}
+
 // ------------- Safely Import Module -------------
 export const compile = async (uri, opts = {}) => {
 
@@ -206,6 +203,7 @@ export const compile = async (uri, opts = {}) => {
     const fileCallback = opts.callbacks?.progress?.file
     const runFileCallback = typeof fileCallback === 'function'
 
+    let pathId = getPathID(uri, opts)
 
     try {
 
@@ -225,15 +223,15 @@ export const compile = async (uri, opts = {}) => {
         const notDirect = output.text || output.datauri || output.objecturl
 
         // Try to Import Natively
-        finalInfo.module = (notDirect) ? undefined : await response.findModule(uri, opts).catch((e) => {})
-        
-        let name = pathUtils.get(uri)
+        const info = (notDirect) ? undefined : await response.findModule(uri, opts).catch((e) => {})
+        finalInfo.module = info?.module
+        if (info?.uri) pathId = getPathID(info.uri, opts) // Set Path ID
 
         if (!finalInfo.module || notDirect) {
 
             // ------------------- Get URI Response -------------------
             const info = await response.findText(uri, opts)
-            name = pathUtils.get(pathUtils.noBase(info.uri, opts))
+            pathId = getPathID(info.uri, opts) // Update Path ID
 
             // ------------------- Try Direct Import -------------------
             try {
@@ -263,15 +261,12 @@ export const compile = async (uri, opts = {}) => {
                 numDependencies = importInfo.length
                 // ------------------- Import Files Asynchronously -------------------
                 const promises = importInfo.map(async (thisImport) => {
-                    await bundle(info, thisImport, opts).catch(e => {
-                        console.error(e)
-                        throw e
-                    }) // can't stop all the requests in midflight...
+                    await bundle(info, thisImport, opts) // can't stop all the requests in midflight...
                     dependenciesResolved++
-                    if (runFileCallback) fileCallback(name, dependenciesResolved, numDependencies) 
+                    if (runFileCallback) fileCallback(pathId, dependenciesResolved, numDependencies) 
                 })
 
-                await Promise.allSettled(promises)
+                await Promise.all(promises)
 
                 // ------------------- Import Updated File Text -------------------
                 finalInfo = await response.parse(info, "text")
@@ -281,16 +276,21 @@ export const compile = async (uri, opts = {}) => {
 
 
         // ------------------- Tell the User the File is Done -------------------
-        if (runFileCallback) fileCallback(name, dependenciesResolved, numDependencies, true) 
+        if (runFileCallback) fileCallback(pathId, dependenciesResolved, numDependencies, true) 
 
         // ------------------- Pass Additional Information to the User -------------------
-        onImport(uri, finalInfo);
+        finalInfo.original = uri
+        onImport(pathId, finalInfo);
 
 
         // ------------------- Return Standard Import Value -------------------
         return finalInfo.module;
-    } catch (e) {
-        if (runFileCallback) fileCallback(name, dependenciesResolved, numDependencies, null, e) 
+    } 
+    
+    // Indicate Failure to the User
+    catch (e) {
+        if (runFileCallback) fileCallback(pathId, dependenciesResolved, numDependencies, null, e) 
+        throw e
     }
 };
 

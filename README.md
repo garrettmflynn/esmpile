@@ -46,7 +46,9 @@ This project can be extended by [es-monitor](https://github.com/garrettmflynn/es
 
 
 ## Open Issues
-- **Live Edit Any ES Module:** Allow for minimal recompiling of a single module (and dependents) after submitting updated text.
+1. **Live Edit Any ES Module:** Allow for minimal recompiling of a single module (and dependents) after submitting updated text.
+
+2. **Allow for Circular Dependencies:** Currently we are aborting an infinite loop. Try importing './src/index.js' from text for an example.
 
 ## Acknowledgments
 This library is maintained by [Garrett Flynn](https://github.com/garrettmflynn) and [Joshua Brewster](https://github.com/joshbrew), who use contract work and community contributions through [Open Collective](https://opencollective.com/brainsatplay) to support themselves.

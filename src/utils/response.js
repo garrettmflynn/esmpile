@@ -68,17 +68,18 @@ export const find = async(uri, opts, callback) => {
 export const findModule = async (uri, opts) => {
     const pathExt = pathUtils.extension(uri)
     const isJSON = pathExt === "json";
-    const module = await find(uri, opts, async (transformed) => await (isJSON ? import(transformed, { assert: { type: "json" } }) : import(transformed)))
-    return module
-}
 
-// Get ESM Module Info (safely)
-export const findText = async (uri, opts) => {
-    const info = await find(uri, opts, get)
-    info.originalURI = uri
+    const info = {}
+    await find(uri, opts, async (transformed) => {
+        info.uri = transformed
+        info.module = await (isJSON ? import(transformed, { assert: { type: "json" } }) : import(transformed))
+    })
+
     return info
 }
 
+// Get ESM Module Text
+export const findText = async (uri, opts) => await find(uri, opts, get)
 
 // Direct Import of ES6 Modules
 export const parse = async (info, type="buffer") => {
