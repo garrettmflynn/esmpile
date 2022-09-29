@@ -11,39 +11,28 @@ This library allows for you to **compile ESM source files** using standard impor
 This project can be extended by [es-monitor](https://github.com/garrettmflynn/es-monitor) to visualize the ESM code of an application.
 
 ## Options
-- **bundle:** Specify the bundle to draw from
+```javascript
+const options = {
+    bundle: 'global', // Specify the bundle name to draw from
+    bundler: 'objecturl', // Specify how to bundle the file
+    callbacks: {
+        progress: {
+            fetch:(path, i, total, done, failed, range) => {}, // Fetch-level updates for each file
+            file: (path, i, total, done, failed) => {} // File-level updates for each dependency resolution
+        }
+    },
+    debug: true, // Toggle debug messages in the Developer Console 
+    dependencies: {}, // Extract a list of dependencies for each file using an empty object
+    onImport: (path, info) => {} // A callback for accumulating non-ESM bundle information (e.g. raw and compiled text, objecturl, datauri, etc.)
+    output: { // Specify which information to output to the user
+        text: true, // Use text for module creation and output using onImport
+        objecturl: true,
+        datauri: true
+    },
+    relativeTo: import.meta.url // Specify what file the paths are relative to.
+}
 
-    - **'global':** Draw from the global registry
-    
-    - **undefined:** Create a new bundle with a random key
-
-    - **any key:** Specify the bundle name
-
-- **bundler:** Specify how to bundle
-
-    - **datauri:** A saveable file with a full specification of the dependencies
-
-    - **objecturl:** A runtime-only file that points to dependencies in memory
-
-- **callbacks:** A set of callbacks used by the API
-
-    -  **progress:** Progress updates on file compilation
-
-        -  **fetch:** Fetch-level updates for each file
-
-        -  **file:** File-level updates for each dependency resolution
-
-- **debug:** A boolean that toggles debug messages in the Developer Console 
-
-- **dependencies:** Extract a list of dependencies for each file using an empty object
-
-- **onImport:** A callback for accumulating non-ESM bundle information (e.g. raw and compiled text, objecturl, datauri, etc.)
-
-- **output:** Specify which information to output to the user
-    - **text:** Use text for module creation and output using onImport
-
-- **relativeTo:** Specify what file the paths are relative to.
-
+```
 
 ## Open Issues
 1. **Live Edit Any ES Module:** Allow for minimal recompiling of a single module (and dependents) after submitting updated text.
