@@ -1,7 +1,7 @@
 {
-  "name": "remote-esm",
-  "version": "0.0.29",
-  "description": "Import ESM from a remote endpoint",
+  "name": "esmpile",
+  "version": "0.0.1",
+  "description": "Compile ESM on the browser",
   "main": "index.js",
   "author": "Garrett Flynn <garrettmflynn@gmail.com>",
   "license": "AGPL-3.0-or-later",
@@ -13,11 +13,10 @@
   "scripts": {
     "start": "tinybuild",
     "build": "tinybuild bundle"
-
   },
   "devDependencies": {
-    "tinybuild": "0.3.186",
-    "device-decoder": "^0.2.17"
+    "device-decoder": "^0.2.17",
+    "tinybuild": "0.3.186"
   },
   "dependencies": {
     "cross-blob": "^3.0.1",
