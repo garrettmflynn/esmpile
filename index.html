@@ -27,10 +27,6 @@
             color: white;
         }
 
-        i {
-            font-size: 80%;
-        }
-
         h1 {
             margin: 0;
         }
@@ -62,9 +58,8 @@
             font-size: 15px;
         }
 
-        .h2-div p {
+        .path {
             margin: 0;
-            font-size: 10px;
         }
         
         .buttons button {
@@ -138,7 +133,7 @@
 
         .progress-div span {
             margin-left: 10px;
-            font-size: 70%;
+            font-size: 65%;
         }
 
         .progress-circle {
@@ -147,7 +142,7 @@
             border-radius: 50%;
             background: black;
             border: 1px solid white;
-            margin-left: 15px;
+            margin-right: 10px;
         }
 
         .progress-circle.resolving {
@@ -207,7 +202,8 @@
             }
 
             const h2 = document.createElement('h2')
-            const pathEl = document.createElement('p')
+            const pathEl = document.createElement('span')
+            pathEl.classList.add('path')
             const progressCircle = document.createElement('div')
             progressCircle.classList.add('progress-circle')
             const time = document.createElement('span')
@@ -215,7 +211,7 @@
             const h2Div = document.createElement('div')
             h2Div.classList.add('h2-div')
             h2Div.appendChild(h2)
-            h2Div.appendChild(pathEl)
+            // h2Div.appendChild(pathEl)
 
 
             const headerDiv = document.createElement('div')
@@ -232,14 +228,15 @@
             button.innerText = 'Import'
             fromText.innerText = 'Compile'
 
-            headerDiv.appendChild(h2Div)
             headerDiv.appendChild(progressCircle)
+            headerDiv.appendChild(h2Div)
+            headerDiv.appendChild(pathEl)
             headerDiv.appendChild(time)
 
             buttonDiv.appendChild(button)
             buttonDiv.appendChild(fromText)
 
-            header.appendChild(h2Div)
+            header.appendChild(headerDiv)
             header.appendChild(buttonDiv)
 
             div.appendChild(header)
@@ -346,7 +343,7 @@
                 entriesForPath.forEach(entry => {
                     entry.bundle = bundle
                     entry.download.classList.remove('inactive') // activate download button
-                    entry.name.innerHTML = `<a href="${bundle.link}" target="_blank">${path}</a>`
+                    if (bundle.info.objecturl) entry.name.innerHTML = `<a href="${bundle.info.objecturl}" target="_blank">${path}</a>`
                 }) // Provide a link
             }
         }
