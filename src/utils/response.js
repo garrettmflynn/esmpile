@@ -72,7 +72,7 @@ export const findModule = async (uri, opts) => {
     const info = {}
     await find(uri, opts, async (transformed) => {
         info.uri = transformed
-        info.module = await (isJSON ? import(transformed, { assert: { type: "json" } }) : import(transformed))
+        info.result = await (isJSON ? import(transformed, { assert: { type: "json" } }) : import(transformed))
     })
 
     return info
@@ -102,7 +102,7 @@ export const parse = async (info, type="buffer") => {
     // Get Object URL
     const objecturl = encode.objecturl.get(bufferOrText)
 
-    info.module = datauriInfo.module
+    info.result = datauriInfo.module
     info.datauri = datauriInfo.datauri
     info.objecturl = objecturl
 

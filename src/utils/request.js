@@ -87,16 +87,19 @@ export const fetchRemote = async (url, options = {}, additionalArgs) => {
         }
     })
 
+
+    const output = {
+        response,
+        ...info
+    }
+
     if (additionalArgs.progress instanceof Function) {
         const status = [null, null]
-        if (response.ok) status[0] = true
-        else status[1] = true
+        if (response.ok) status[0] = output
+        else status[1] = output
         additionalArgs.progress(pathId, bytesReceived, bytes, ...status, response.headers.get('Range')) // Send Done
     }
 
 
-    return {
-        response,
-        ...info
-    }
+    return output
 }

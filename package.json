@@ -1,14 +1,17 @@
 {
   "name": "esmpile",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Compile ESM source files on the browser",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
   "author": "Garrett Flynn <garrettmflynn@gmail.com>",
   "license": "AGPL-3.0-or-later",
   "private": false,
   "type": "module",
   "files": [
-    "utils/*"
+    "dist/**",
+    "src/**",
+    "extensions/*"
   ],
   "scripts": {
     "start": "tinybuild",

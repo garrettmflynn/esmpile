@@ -27,7 +27,7 @@ export const get = async (uri, opts, text, evaluate = true) => {
                 }
 
                 // return source map
-                const outInfo = { module: JSON.parse(newText) }
+                const outInfo = { result: JSON.parse(newText) }
                 outInfo.text = {original: newText, updated: null}
                 return outInfo
             }

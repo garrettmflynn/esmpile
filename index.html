@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>esmpile</title>
+    <title>ESMpile</title>
     <style>
 
         * {
@@ -53,37 +53,66 @@
             margin-bottom: 15px;
         }
 
-        h2 {
+        .h2-div {
+            pointer-events: none;
+        }
+
+        .h2-div h2 {
             margin: 0;
             font-size: 15px;
         }
 
-        button {
+        .h2-div p {
+            margin: 0;
+            font-size: 10px;
+        }
+        
+        .buttons button {
             padding: 5px 10px;
             color: white;
             border: 1px solid white;
             background: transparent;
             border-radius: 5px;
             margin-left: 10px;
+            font-size: 70%;
             cursor: pointer;
         }
 
-        #tests > div > div {
+        button.inactive {
+            cursor: default;
+            opacity: 0.5;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+
+        #tests .header {
             width: 100%;
-            padding: 10px 25px;
+            padding: 10px;
             background: black;
             color: white;
             display: flex;
             align-items: center;
             justify-content: space-between;
-
+            transition: height 0.5s;
+            cursor: pointer;
         }
+
+        .error {
+            padding: 10px 15px;
+            background:rgb(255, 191, 191);
+            font-size: 80%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
 
         ul {
             list-style: none;
             padding: 0;
             margin: 0;
             font-size: 80%;
+            overflow: hidden;
         }
 
         li {
@@ -92,7 +121,7 @@
             justify-content: space-between;
         }
 
-        li > div > span {
+        li > div > * {
             margin-left: 10px;
         }
 
@@ -140,7 +169,7 @@
 </head>
 
 <body>
-    <nav><h1>esmpile</h1></nav>
+    <nav><h1>ESMpile</h1></nav>
     <section>
         <div id="tests"></div>
     </section>
@@ -152,37 +181,60 @@
     let esm = library
 
     // ---------------- Preload the Typescript Service ----------------
-    await esm.load.script('./extensions/typescriptServices.js');
+    await esm.load.script('./extensions/typescriptServices.min.js');
 
     // ---------------- Set Global Variables ----------------
     const testDiv = document.getElementById('tests')
     const entries = {}
     const displays = {}
 
-    const createDisplay = (label, path) => {
+    const createDisplay = (label, info) => {
+
         if (!displays[label]) {
             const div = document.createElement('div')
             const header = document.createElement('div')
+            const error = document.createElement('div')
+            error.classList.add('error')
+            error.style.display = 'none'
+            header.classList.add('header')
+
             const ul = document.createElement('ul')
+
+            // Toggle List View
+            header.onclick = () => {
+                if (ul.style.height === '0px') ul.style.height = ``
+                else ul.style.height = `0px`
+            }
+
             const h2 = document.createElement('h2')
+            const pathEl = document.createElement('p')
             const progressCircle = document.createElement('div')
             progressCircle.classList.add('progress-circle')
             const time = document.createElement('span')
 
             const h2Div = document.createElement('div')
-            h2Div.classList.add('progress-div')
+            h2Div.classList.add('h2-div')
+            h2Div.appendChild(h2)
+            h2Div.appendChild(pathEl)
+
+
+            const headerDiv = document.createElement('div')
+            headerDiv.classList.add('progress-div')
 
             const buttonDiv = document.createElement('div')
+            buttonDiv.classList.add('buttons')
             const button = document.createElement('button')
             const fromText = document.createElement('button')
 
             h2.innerText = label
-            button.innerText = 'Direct Import'
-            fromText.innerText = 'From Text'
+            pathEl.innerText = info.uri
 
-            h2Div.appendChild(h2)
-            h2Div.appendChild(progressCircle)
-            h2Div.appendChild(time)
+            button.innerText = 'Import'
+            fromText.innerText = 'Compile'
+
+            headerDiv.appendChild(h2Div)
+            headerDiv.appendChild(progressCircle)
+            headerDiv.appendChild(time)
 
             buttonDiv.appendChild(button)
             buttonDiv.appendChild(fromText)
@@ -191,10 +243,11 @@
             header.appendChild(buttonDiv)
 
             div.appendChild(header)
+            div.appendChild(error)
             div.appendChild(ul)
             testDiv.appendChild(div)
 
-            displays[label] = {
+            const display = displays[label] = {
                 name: label,
                 list: ul, 
                 progress: progressCircle, 
@@ -203,6 +256,7 @@
                     direct: button,
                     text: fromText
                 },
+                error,
                 entries: {}
             }
 
@@ -221,10 +275,16 @@
             const name = document.createElement('span')
             const amount = document.createElement('span')
             const status = document.createElement('span')
+
+            const download = document.createElement('button')
+            download.classList.add('inactive')
+            download.innerText = 'Download'
+
             display.list.appendChild(li)
             div.appendChild(status)
             div.appendChild(amount)
-            
+            div.appendChild(download)
+
             li.appendChild(name)
             li.appendChild(div)
 
@@ -234,15 +294,24 @@
                 amount, 
                 status, 
                 path, 
-                displayName: display.name,
+                display,
+                download,
                 reset: () => {
                     name.innerText = path
                     status.innerText = ''
                     amount.innerText = ''
-                }
+                    download.classList.add('inactive')
+                    display.list.style.height = ''
+                },
+                bundle: null
             }
 
             entry.reset()
+
+            download.onclick = () => {
+                console.log(entry)
+                if (entry.bundle) entry.bundle.download()
+            }
 
             if (!entries[path]) entries[path] = []
             entries[path].push(entry)
@@ -264,25 +333,32 @@
     options.bundler = 'objecturl' // Specify what sort of link to import with | Can be 'datauri' (saveable) or 'objecturl' (runtime only)
     options.dependencies = {} // Track all file dependencies
     options.debug = false // Show debug messages
+    options.callbacks = {progress: {}}
+    options.callbacks.onfile = async (path, bundle) => {
 
-    options.onImport = async (path, info) => {
-        const link = info.objecturl ?? info.datauri
-
+        console.log(path, bundle)
         // Add Link to Entry
-        if (link) {
-            if (entries[path]) 
-            entries[path].forEach(entry => {
-                entry.name.innerHTML = `<a href="${info.objecturl}" target="_blank">${path}</a>`
-            }) // Provide a link
+        if (bundle.link) {
+
+            const entriesForPath = entries[path]
+            if (entriesForPath) {
+
+                entriesForPath.forEach(entry => {
+                    entry.bundle = bundle
+                    entry.download.classList.remove('inactive') // activate download button
+                    entry.name.innerHTML = `<a href="${bundle.link}" target="_blank">${path}</a>`
+                }) // Provide a link
+            }
         }
 
         //---------------- Import Self and Use That as the Core Library ----------------
-        if (info.original === selfURI) esm = info.module
+        if (bundle.info.original === selfURI) esm = bundle.result
 
         // Resolve a Source Map
-        if (info.original === sourceURI) {
-            if (info.text) {
-                let sourcemap = await esm.sourceMap.get(sourceURI, options, info.text.updated)
+
+        if (bundle.info.original === sourceURI) {
+            if (bundle.text) {
+                let sourcemap = await esm.sourceMap.get(sourceURI, options, bundle.text.updated)
                 if (sourcemap) {
                     console.log('source map!', sourcemap)
                 } else console.log('No source map at specified location:', sourceURI)
@@ -291,16 +367,21 @@
 
         // Execute a function
         if (path === executable) {
-            info.module.imports.default()
+            bundle.result.imports.default()
         }
 
         // Create a worker
         if (path.includes('worker')) {
-            console.log('Creating a dummy worker!', new Worker(info.objecturl, { type: "module" }))
+            console.log('Creating a dummy worker!', new Worker(bundle.objecturl, { type: "module" }))
         }
     }
 
+    // ---------------- Test Bundles ----------------
+    // const res = await esm.compile('./tests/bundled/device.frontend.esm.esmpile.js', options)
+    // const worker = await esm.compile('./tests/bundled/stream.big.worker.esmpile.js', options)
+
     const forceText = { 
+        bundler: 'datauri', // Toggle between this more naturally...
         output: {
             text: true 
         } 
@@ -350,37 +431,34 @@
         const onClick = async (override) => {
 
             // Reset Display
-            for (let name in display.entries) display.entries[name].reset()
+            for (let name in display.entries) display.entries[name].reset(true)
 
             display.progress.classList.add('resolving')
 
             const selectedOptions = test.options ?? options
 
             // Specify Callbacks Internally (to update ui)
-            options.callbacks = {
-                progress: {
-                    file: (path, i, total, done, failed) => {
-                        if (!entries[path]) createEntry(path, display)
-                        if (done) entries[path].status.innerText = `Resolved`
-                        else if (failed) entries[path].status.innerText = `Failed`
-                        else {
-                            entries[path].status.innerText = `Resolving`
-                            let value = i;
-                            if (total) value = `${(100*value/total).toFixed(1)}%`
-                            entries[path].amount.innerText = `${value}`
-                        }
-                    },
-                    fetch: (path, i, total, done, failed, range) => {
-                        if (!entries[path]) createEntry(path, display)
-                        if (done) entries[path].status.innerText = `Fetched`
-                        else if (failed) entries[path].status.innerText = `Failed`
-                        else{
-                            entries[path].status.innerText = `Fetching`
-                            let value = i;
-                            if (total) value = `${(100*value/total).toFixed(1)}%`
-                            entries[path].amount.innerText = `${value}${range ? ` of ${range}` : ''}`
-                        }
-                    }
+            options.callbacks.progress.file = (path, i, total, done, failed) => {
+                if (!entries[path]) createEntry(path, display)
+                if (done) entries[path].status.innerText = `Resolved`
+                else if (failed) entries[path].status.innerText = `Failed`
+                else {
+                    entries[path].status.innerText = `Resolving`
+                    let value = i;
+                    if (total) value = `${(100*value/total).toFixed(1)}%`
+                    entries[path].amount.innerText = `${value}`
+                }
+            }
+
+            options.callbacks.progress.fetch = (path, i, total, done, failed, range) => {
+                if (!entries[path]) createEntry(path, display)
+                if (done) entries[path].status.innerText = `Fetched`
+                else if (failed) entries[path].status.innerText = `Failed`
+                else{
+                    entries[path].status.innerText = `Fetching`
+                    let value = i;
+                    if (total) value = `${(100*value/total).toFixed(1)}%`
+                    entries[path].amount.innerText = `${value}${range ? ` of ${range}` : ''}`
                 }
             }
 
@@ -390,20 +468,24 @@
 
             const tic = performance.now()
             const res = await esm.compile(test.uri, fullOptions).catch(e => {
-                console.error('Failed ESMpilation', e)
+                display.error.innerText = `Compilation Error: ${e.message}`
+                display.error.style.display = ""
                 display.progress.classList.add('failed') // resolution failed
             })
             const toc = performance.now()
+
             if (res) display.progress.classList.add('resolved')
             display.time.innerHTML = `${(toc-tic).toFixed(3)}ms`
+
+            return res
         }
 
         display.buttons.direct.onclick = () => onClick()
         display.buttons.text.onclick = () => onClick(forceText)
 
-    }
 
-    displays.self.buttons.direct.click() // auto-import self
+        if (label === 'self') display.buttons.direct.click() // auto-import self
+    }
 
 
 </script>
