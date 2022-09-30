@@ -405,7 +405,11 @@
 
         executable: {
             uri: executable,
-        },
+        }
+    }
+
+
+    const dependsOnNodeModules = {
 
         node_module: {
             uri: 'device-decoder',
@@ -416,6 +420,10 @@
         }
 
     }
+
+    const hasNodeModules = (await fetch('./node_modules/device-decoder/package.json')).ok
+    if (hasNodeModules) Object.assign(tests, dependsOnNodeModules)
+    else console.warn('node_modules folder has not been found. Tests that rely on node_modules have been removed...', dependsOnNodeModules)
 
     
     // ---------------- Run Tests ----------------
