@@ -9,7 +9,7 @@ This library allows for you to **compile ESM source files** using standard impor
 > **Note:** **esmpile** is a core library of the [Brains@Play Framework](https://github.com/brainsatplay/brainsatplay/README.md)
  
 ## Getting Started
-## The List of Options
+### The List of Options
 ```javascript
 const options = {
     bundle: 'global', // Specify the bundle name to draw from
