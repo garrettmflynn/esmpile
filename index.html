@@ -301,8 +301,6 @@
                 download,
                 reset: () => {
                     name.innerText = path
-                    status.innerText = ''
-                    amount.innerText = ''
                     download.classList.add('inactive')
                     display.list.style.height = ''
                 },
@@ -512,9 +510,6 @@
                 test.bundle = new esm.Bundle(test.uri, fullOptions)
                 await test.bundle.resolve().catch(catchError)
 
-                const toc = performance.now()
-                display.time.innerHTML = `${(toc-tic).toFixed(3)}ms`
-
             } else {
                 
                 const bundler = fullOptions.bundler
@@ -529,9 +524,14 @@
                 catch(e){ catchError(e) }
             }
 
+
             // await test.bundle.encoded
             const result = await test.bundle.result
             if (result !== undefined) display.progress.classList.add('resolved')
+
+            const toc = performance.now()
+            display.time.innerHTML = `${(toc-tic).toFixed(3)}ms`
+
 
             forEachFile(test.bundle)
             test.bundle.entries.forEach(forEachFile)

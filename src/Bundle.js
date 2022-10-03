@@ -14,8 +14,9 @@ const global = globalThis.REMOTEESM_BUNDLES.global
 const noEncoding = `No buffer or text to bundle for`
 
 // Import ES6 Modules (and replace their imports with actual file imports!)
-const re = /[^\n]*(?<![\/\/])import\s+([ \n\t]*(?:(?:\* (?:as .+))|(?:[^ \n\t\{\}]+[ \n\t]*,?)|(?:[ \n\t]*\{(?:[ \n\t]*[^ \n\t"'\{\}]+[ \n\t]*,?)+\}))[ \n\t]*)from[ \n\t]*(['"])([^'"\n]+)(?:['"])([ \n\t]*assert[ \n\t]*{type:[ \n\t]*(['"])([^'"\n]+)(?:['"])})?/gm;
-
+// TODO: Handle exports without stalling...
+// const re = /[^\n]*(?<![\/\/])(import|export)\s+([ \t]*(?:(?:\* (?:as .+))|(?:[^ \t\{\}]+[ \t]*,?)|(?:[ \t]*\{(?:[ \t]*[^ \t"'\{\}]+[ \t]*,?)+\}))[ \t]*)from[ \t]*(['"])([^'"\n]+)(?:['"])([ \t]*assert[ \t]*{[ \n\t]*type:[ \n\t]*(['"])([^'"\n]+)(?:['"])[\n\t]*})?/gm
+const re = /[^\n]*(?<![\/\/])(import)\s+([ \t]*(?:(?:\* (?:as .+))|(?:[^ \t\{\}]+[ \t]*,?)|(?:[ \t]*\{(?:[ \t]*[^ \t"'\{\}]+[ \t]*,?)+\}))[ \t]*)from[ \t]*(['"])([^'"\n]+)(?:['"])([ \t]*assert[ \t]*{[ \n\t]*type:[ \n\t]*(['"])([^'"\n]+)(?:['"])[\n\t]*})?/gm
 export function get(url, opts=this.options){
     const pathId = (url) ? pathUtils.pathId(url, opts) : undefined // Set Path ID
     let ref = globalThis.REMOTEESM_BUNDLES[opts.collection]
@@ -185,7 +186,7 @@ export default class Bundle {
 
         const drill = (target) => {
             target.dependencies.forEach(o => {
-                if (!entries.includes(o)) {
+                if (!entries.includes(o) && o !== this) {
                     entries.push(o)
                     drill(o)
                 }
@@ -260,15 +261,19 @@ export default class Bundle {
                 // ------------------- Get Import Details -------------------
                 this.imports = []
                 const matches = Array.from(this.info.text.updated.matchAll(re))
-                matches.forEach(m => {
-                    this.info.text.updated = this.info.text.updated.replace(m[0], ``); // Replace found text
-                    const wildcard = !!m[1].match(/\*\s+as/);
-                    const variables = m[1].replace(/\*\s+as/, "").trim();
-                    this.imports.push({
-                        path: m[3],
-                        variables,
-                        wildcard
-                    });
+                matches.forEach(([original, prefix, command, delimiters, path]) => {
+
+                    if (path){
+                        this.info.text.updated = this.info.text.updated.replace(original, ``); // Replace found text
+                        const wildcard = !!command.match(/\*\s+as/);
+                        const variables = command.replace(/\*\s+as/, "").trim();
+                        this.imports.push({
+                            path,
+                            prefix,
+                            variables,
+                            wildcard
+                        });
+                    }
                 })
 
                 this.derived.dependencies.resolved = 0
@@ -296,7 +301,7 @@ export default class Bundle {
     }
 
     importDependency = async (info) => {
-        const { variables, wildcard } = info;
+        const { prefix, variables, wildcard } = info;
         let path = info.path
         const absolutePath = pathUtils.absolute(path)
         
@@ -325,23 +330,26 @@ export default class Bundle {
             const encoded = await bundle.encoded 
 
             if (typeof encoded === "string") {
-                this.info.text.updated = `import ${wildcard ? "* as " : ""}${variables} from "${encoded}"; // Imported from ${bundle.name}
-                      ${this.info.text.updated}`;
+                this.info.text.updated = `
+                ${prefix} ${wildcard ? "* as " : ""}${variables} from "${encoded}"; // Imported from ${bundle.name}
+                ${this.info.text.updated}`;
             }
     
             // Passed by Reference (e.g. fallbacks)
             else {
                 
                 const replaced = variables.replace('{', '').replace('}', '')
-                const exportDefault = (replaced !== variables) ? true : false
+                const exportDefault = (replaced === variables) ? true : false
                 const splitVars = variables.replace('{', '').replace('}', '').split(',').map(str => str.trim())
 
                 const insertVariable = (variable) => {
                     let end = ''
-                    if (exportDefault) end = `.default`
-                    else if (!wildcard) end = `.${variable}`
-
-                    this.info.text.updated = `const ${variable} = (await globalThis.REMOTEESM_BUNDLES["${bundle.collection}"]["${bundle.name}"].result)${end};  
+                    if (!wildcard) {
+                        if (exportDefault) end = `.default`
+                        else end = `.${variable}`
+                    }
+                    this.info.text.updated = `
+                    ${prefix === 'import' ? '' : 'export '}const ${variable} = (await globalThis.REMOTEESM_BUNDLES["${bundle.collection}"]["${bundle.name}"].result)${end};
                     ${this.info.text.updated}`;
                 }
 
@@ -430,8 +438,8 @@ export default class Bundle {
         if(foundCircular) {
             this.options._esmpile.circular.add(this.url, o.url)
             this.options._esmpile.circular.add(o.url)
-            this.circular()
-            o.circular()
+            this.circular(o)
+            o.circular(this)
         }
     }
 
@@ -473,10 +481,10 @@ export default class Bundle {
     }
 
     // ------------------- Handle Circular References ------------------- //
-    circular = async () => {
+    circular = async (o) => {
         const result = await this.resolve().catch((e) => {
             console.warn(`Circular dependency detected: Fallback to direct import for ${this.url} failed...`)
-            const message = `Circular dependency detected: ${uriPathID} <-> ${bundleKey}.`
+            const message = `Circular dependency detected: ${this.uri} <-> ${o.uri}.`
             throw new Error(message)
         })
 

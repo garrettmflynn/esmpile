@@ -1,13 +1,9 @@
 import * as pathUtils from './path.js'
-
-export const defaults = {
-    nodeModules: "node_modules",
-    relativeTo: "./"
-};
+import defaults from './defaults.js'
 
 export const path = (opts) => {
-    const nodeModules = opts.nodeModules ?? defaults.nodeModules;
-    const relativeTo = opts.relativeTo ?? defaults.relativeTo;
+    const nodeModules = opts.nodeModules ?? defaults.nodeModules.nodeModules;
+    const relativeTo = opts.relativeTo ?? defaults.nodeModules.relativeTo;
     return pathUtils.get(nodeModules, relativeTo)
 }
 

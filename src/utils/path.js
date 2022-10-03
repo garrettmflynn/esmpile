@@ -1,5 +1,5 @@
 import * as mimeTypes from './mimeTypes.js'
-import * as nodeModules from './nodeModules.js'
+import defaults from './defaults.js'
 
 const urlSep = '://'
 
@@ -84,8 +84,8 @@ export const noBase = (path, opts, removeNode) => {
     path = (globalThis.location) ? path.replace(`${base(globalThis.location.href)}/`, "./") : path
 
     const absolutePath = absolute(path, true)
-    const relativeTo = opts.relativeTo ?? nodeModules.defaults.relativeTo
-    const nodeModulePath = opts.nodeModules ?? nodeModules.defaults.nodeModules
+    const relativeTo = opts.relativeTo ?? defaults.nodeModules.relativeTo
+    const nodeModulePath = opts.nodeModules ?? defaults.nodeModules.nodeModules
     
     // Pass Absolute
     if (absolutePath) return path

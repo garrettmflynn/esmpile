@@ -46,9 +46,11 @@ The extension code has been generated using our [TypeScript Services minifier](h
 ## Open Issues
 1. **Live Edit Any ES Module:** Allow for minimal recompiling of a single module (and dependents) after submitting updated text.
 
-2. **Allow for Circular Dependencies:** Currently we are aborting an infinite loop. Try importing './src/index.js' from text for an example.
+2.  **Visualize Code Execution**: This project could be extended by [es-monitor](https://github.com/garrettmflynn/es-monitor) to visualize the ESM code execution of an application.
 
-3. **Visualize Code Execution**: This project could be extended by [es-monitor](https://github.com/garrettmflynn/es-monitor) to visualize the ESM code execution of an application.
+3. **Develop a RegExp that handles `export * as name from "path"` syntax:** We have a draft RegExp that extends the existing one for imports—but it stalls when importing self (likely because of the amount of basic exports in the files).
+
+4. **Allow for Any Circular Dependencies:** Currently we are falling back to direct imports for files with circular depenencies.
 
 
 ## Acknowledgments
