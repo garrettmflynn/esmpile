@@ -321,8 +321,10 @@
 
         return entry
     }
+    
 
-    const executable= './tests/index.js'
+    const circular = './tests/circular/index.js'
+    const executable= './tests/basic/index.js'
     const sourceURI = './dist/index.esm.js'
     const selfURI = './src/index.js'
 
@@ -350,7 +352,7 @@
         if (entriesForPath) {
             entriesForPath.forEach(entry => {
                 entry.bundle = bundle
-                
+
                 // Can be accessed with a link
                 if (bundle.encodings.objecturl)  entry.name.innerHTML = `<a href="${bundle.encodings.objecturl}" target="_blank">${path}</a>`
                
@@ -376,6 +378,11 @@
         // Execute a function
         if (bundle.uri === executable) {
             result.imports.default()
+        }
+
+        if (bundle.uri === circular) {
+            result.chicken.default()
+            result.egg.default()
         }
 
         // Create a worker
@@ -425,6 +432,10 @@
 
         executable: {
             uri: executable,
+        },
+
+        circular: {
+            uri: circular,
         }
     }
 
