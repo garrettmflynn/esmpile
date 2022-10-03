@@ -325,6 +325,7 @@
     const executable= './tests/basic/index.js'
     const sourceURI = './dist/index.esm.js'
     const selfURI = './src/index.js'
+    const wavFile = './tests/kalimba.wav'
 
 
     // ---------------- Set Options ----------------
@@ -344,6 +345,7 @@
 
         // Add Link to Entry
         const result = await bundle.result
+        const encoded = await bundle.encoded
 
         // Can be downloaded
         const entriesForPath = entries[path]
@@ -386,6 +388,16 @@
         // Create a worker
         if (bundle.uri.includes('worker')) {
             console.log('Creating a dummy worker!', new Worker(bundle.objecturl, { type: "module" }))
+        }
+
+        if (bundle.uri === wavFile) {
+            const audio = document.createElement('audio')
+            audio.autoplay = true
+            console.log('encoded', encoded)
+            audio.src = await encoded
+            audio.onended = () => {
+                audio.remove()
+            }
         }
     }
 
@@ -434,7 +446,11 @@
 
         circular: {
             uri: circular,
-        }
+        },
+
+        wav: {
+            uri: wavFile
+        },
     }
 
 
