@@ -1,9 +1,7 @@
-import * as encode from "./encode/index.js";
+
 import * as transformations from './transformations.js'
 import * as handlers from './handlers.js'
 import * as pathUtils from "./path.js";
-import * as mimeTypes from "./mimeTypes.js";
-import * as compile from "./compile.js";
 import { handleFetch } from "./request.js";
 
 
@@ -80,31 +78,3 @@ export const findModule = async (uri, opts) => {
 
 // Get ESM Module Text
 export const findText = async (uri, opts) => await find(uri, opts, get)
-
-// Direct Import of ES6 Modules
-export const parse = async (info, type="buffer") => {
-
-    let bufferOrText = (type === 'text') ? info.text.updated :  info.buffer 
-
-    // Compile Code
-    const pathExt = pathUtils.extension(info.uri)
-    let mimeType = mimeTypes.get(pathExt)
-    switch (mimeType) {
-        case 'text/typescript':
-            bufferOrText = compile.typescript(info, type)
-            mimeType = mimeTypes.js
-            break;
-    }
-
-    // Get Data URI
-    const datauriInfo = await encode.datauri.get(bufferOrText, info.uri, mimeType)
-
-    // Get Object URL
-    const objecturl = encode.objecturl.get(bufferOrText)
-
-    info.result = datauriInfo.module
-    info.datauri = datauriInfo.datauri
-    info.objecturl = objecturl
-
-    return info
-}

@@ -50,7 +50,7 @@
         }
 
         .h2-div {
-            pointer-events: none;
+            cursor: pointer;
         }
 
         .h2-div h2 {
@@ -89,7 +89,6 @@
             align-items: center;
             justify-content: space-between;
             transition: height 0.5s;
-            cursor: pointer;
         }
 
         .error {
@@ -141,19 +140,22 @@
             height: 10px;
             border-radius: 50%;
             background: black;
-            border: 1px solid white;
+            border: 1px solid rgb(193, 193, 193);
             margin-right: 10px;
         }
 
         .progress-circle.resolving {
+            border: none;
             background: rgb(255, 237, 123);
         }
 
         .progress-circle.failed {
+            border: none;
             background: rgb(255, 123, 123);
         }
 
         .progress-circle.resolved {
+            border: none;
             background: rgb(141, 255, 123);
         }
 
@@ -195,12 +197,6 @@
 
             const ul = document.createElement('ul')
 
-            // Toggle List View
-            header.onclick = () => {
-                if (ul.style.height === '0px') ul.style.height = ``
-                else ul.style.height = `0px`
-            }
-
             const h2 = document.createElement('h2')
             const pathEl = document.createElement('span')
             pathEl.classList.add('path')
@@ -211,6 +207,12 @@
             const h2Div = document.createElement('div')
             h2Div.classList.add('h2-div')
             h2Div.appendChild(h2)
+
+            // Toggle List View
+            h2Div.onclick = () => {
+                if (ul.style.height === '0px') ul.style.height = ``
+                else ul.style.height = `0px`
+            }
             // h2Div.appendChild(pathEl)
 
 
@@ -220,13 +222,15 @@
             const buttonDiv = document.createElement('div')
             buttonDiv.classList.add('buttons')
             const button = document.createElement('button')
-            const fromText = document.createElement('button')
+            const compile = document.createElement('button')
+            const bundle = document.createElement('button')
 
             h2.innerText = label
             pathEl.innerText = info.uri
 
             button.innerText = 'Import'
-            fromText.innerText = 'Compile'
+            compile.innerText = 'Compile'
+            bundle.innerText = 'Bundle'
 
             headerDiv.appendChild(progressCircle)
             headerDiv.appendChild(h2Div)
@@ -234,7 +238,8 @@
             headerDiv.appendChild(time)
 
             buttonDiv.appendChild(button)
-            buttonDiv.appendChild(fromText)
+            buttonDiv.appendChild(compile)
+            buttonDiv.appendChild(bundle)
 
             header.appendChild(headerDiv)
             header.appendChild(buttonDiv)
@@ -251,7 +256,8 @@
                 time, 
                 buttons: {
                     direct: button,
-                    text: fromText
+                    compile,
+                    bundle
                 },
                 error,
                 entries: {}
@@ -306,7 +312,6 @@
             entry.reset()
 
             download.onclick = () => {
-                console.log(entry)
                 if (entry.bundle) entry.bundle.download()
             }
 
@@ -326,36 +331,42 @@
     const options = {}
 
     options.relativeTo = import.meta.url // Ensure appropriate relative paths are used
-    options.bundle = null //'global' // Specify which bundle to reference. Specify 'global' to use same bundle across all imports. Don't specify to create a new bundle
+    options.collection = null //'global' // Specify which bundle to reference. Specify 'global' to use same bundle across all imports. Don't specify to create a new bundle
     options.bundler = 'objecturl' // Specify what sort of link to import with | Can be 'datauri' (saveable) or 'objecturl' (runtime only)
-    options.dependencies = {} // Track all file dependencies
     options.debug = false // Show debug messages
     options.callbacks = {progress: {}}
-    options.callbacks.onfile = async (path, bundle) => {
+    options.circular = 'throw' // 'hide', 'resolve' (not implemented)
 
-        console.log(path, bundle)
+
+    const forEachFile = async (bundle) => {
+
+        const path = bundle.name
+
         // Add Link to Entry
-        if (bundle.link) {
+        const result = await bundle.result
 
-            const entriesForPath = entries[path]
-            if (entriesForPath) {
-
-                entriesForPath.forEach(entry => {
-                    entry.bundle = bundle
-                    entry.download.classList.remove('inactive') // activate download button
-                    if (bundle.info.objecturl) entry.name.innerHTML = `<a href="${bundle.info.objecturl}" target="_blank">${path}</a>`
-                }) // Provide a link
-            }
+        // Can be downloaded
+        const entriesForPath = entries[path]
+        if (entriesForPath) {
+            entriesForPath.forEach(entry => {
+                entry.bundle = bundle
+                
+                // Can be accessed with a link
+                if (bundle.encodings.objecturl)  entry.name.innerHTML = `<a href="${bundle.encodings.objecturl}" target="_blank">${path}</a>`
+               
+                // Can be downloaded
+                if (bundle.encodings.datauri) entry.download.classList.remove('inactive') // activate download button
+            }) // Provide a link
         }
 
         //---------------- Import Self and Use That as the Core Library ----------------
-        if (bundle.info.original === selfURI) esm = bundle.result
+        if (bundle.uri === selfURI) esm = result
 
         // Resolve a Source Map
 
-        if (bundle.info.original === sourceURI) {
-            if (bundle.text) {
-                let sourcemap = await esm.sourceMap.get(sourceURI, options, bundle.text.updated)
+        if (bundle.uri === sourceURI) {
+            if (bundle.info.text) {
+                const sourcemap = await bundle.sources()
                 if (sourcemap) {
                     console.log('source map!', sourcemap)
                 } else console.log('No source map at specified location:', sourceURI)
@@ -363,12 +374,12 @@
         }
 
         // Execute a function
-        if (path === executable) {
-            bundle.result.imports.default()
+        if (bundle.uri === executable) {
+            result.imports.default()
         }
 
         // Create a worker
-        if (path.includes('worker')) {
+        if (bundle.uri.includes('worker')) {
             console.log('Creating a dummy worker!', new Worker(bundle.objecturl, { type: "module" }))
         }
     }
@@ -377,10 +388,19 @@
     // const res = await esm.compile('./tests/bundled/device.frontend.esm.esmpile.js', options)
     // const worker = await esm.compile('./tests/bundled/stream.big.worker.esmpile.js', options)
 
-    const forceText = { 
+    const compileOpts = { 
+        bundler: 'objecturl', // Toggle between this more naturally...
+        output: {
+            text: true,
+            objecturl: true // allow links
+        } 
+    }
+
+    const bundleOpts = { 
         bundler: 'datauri', // Toggle between this more naturally...
         output: {
-            text: true 
+            text: true,
+            objecturl: true // allow links
         } 
     }
 
@@ -442,51 +462,74 @@
 
             const selectedOptions = test.options ?? options
 
+            const handleProcess = (path, i, total, range, message) => {
+                entries[path].status.innerText = message
+                let value = i;
+                if (total) value = `${(100*value/total).toFixed(1)}%`
+                entries[path].amount.innerText = `${value}${range ? ` of ${range}` : ''}`
+            }
+            const handleFailed = (path, failed) => {
+                entries[path].status.innerText = (failed.message.includes('The user aborted a request.')) ? `Aborted` : `Failed`
+            }
+
             // Specify Callbacks Internally (to update ui)
             options.callbacks.progress.file = (path, i, total, done, failed) => {
                 if (!entries[path]) createEntry(path, display)
                 if (done) entries[path].status.innerText = `Resolved`
-                else if (failed) entries[path].status.innerText = `Failed`
-                else {
-                    entries[path].status.innerText = `Resolving`
-                    let value = i;
-                    if (total) value = `${(100*value/total).toFixed(1)}%`
-                    entries[path].amount.innerText = `${value}`
-                }
+                else if (failed) handleFailed(path, failed)
+                else handleProcess(path, i, total, null, `Resolving`)
             }
 
             options.callbacks.progress.fetch = (path, i, total, done, failed, range) => {
                 if (!entries[path]) createEntry(path, display)
                 if (done) entries[path].status.innerText = `Fetched`
-                else if (failed) entries[path].status.innerText = `Failed`
-                else{
-                    entries[path].status.innerText = `Fetching`
-                    let value = i;
-                    if (total) value = `${(100*value/total).toFixed(1)}%`
-                    entries[path].amount.innerText = `${value}${range ? ` of ${range}` : ''}`
-                }
+                else if (failed) handleFailed(path, failed)
+                else handleProcess(path, i, total, range, `Fetching`)
             }
-
-
 
             const fullOptions = Object.assign(Object.assign({}, options), override)
 
             const tic = performance.now()
-            const res = await esm.compile(test.uri, fullOptions).catch(e => {
-                display.error.innerText = `Compilation Error: ${e.message}`
-                display.error.style.display = ""
-                display.progress.classList.add('failed') // resolution failed
-            })
-            const toc = performance.now()
 
-            if (res) display.progress.classList.add('resolved')
-            display.time.innerHTML = `${(toc-tic).toFixed(3)}ms`
+            const catchError = e => {
+                    display.error.innerText = `Compilation Error: ${e.message}`
+                    display.error.style.display = ""
+                    display.progress.classList.add('failed') // resolution failed
+                }
 
-            return res
+            if (!test.bundle) {
+                test.bundle = new esm.Bundle(test.uri, fullOptions)
+                await test.bundle.resolve().catch(catchError)
+
+                const toc = performance.now()
+                display.time.innerHTML = `${(toc-tic).toFixed(3)}ms`
+
+            } else {
+                
+                const bundler = fullOptions.bundler
+                delete fullOptions.bundler
+                // Resetting Bundler Options
+                try {
+                    test.bundle.options = fullOptions
+                    await test.bundle.setBundler(bundler) // ensure you can wait
+                } 
+                
+                // Catch Any Bundling Errors
+                catch(e){ catchError(e) }
+            }
+
+            // await test.bundle.encoded
+            const result = await test.bundle.result
+            if (result !== undefined) display.progress.classList.add('resolved')
+
+            forEachFile(test.bundle)
+            test.bundle.entries.forEach(forEachFile)
+            return result
         }
 
         display.buttons.direct.onclick = () => onClick()
-        display.buttons.text.onclick = () => onClick(forceText)
+        display.buttons.compile.onclick = () => onClick(compileOpts)
+        display.buttons.bundle.onclick = () => onClick(bundleOpts)
 
 
         if (label === 'self') display.buttons.direct.click() // auto-import self

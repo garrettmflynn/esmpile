@@ -8,7 +8,8 @@ export const getURL = (path) => {
 }
 
 export const handleFetch = async (path, options = {}) => {
-    if (!options.mode) options.mode = 'cors' // Auto-CORS Support
+    if (!options.fetch) options.fetch = {}
+    if (!options.fetch.mode) options.fetch.mode = 'cors' // Auto-CORS Support
     const url = getURL(path)
 
     const progressCallback = options?.callbacks?.progress?.fetch
@@ -32,13 +33,14 @@ export const fetchRemote = async (url, options = {}, additionalArgs) => {
     const path = additionalArgs.path ?? url
     const pathId = pathUtils.get(pathUtils.noBase(path, options))
 
-    const response = await globalThis.fetch(url, options)
+    const response = await globalThis.fetch(url, options.fetch)
 
     let bytesReceived = 0
     let buffer = [];
     let bytes = 0;
 
-    const info = await new Promise(async resolve => {
+    const hasProgressFunction  = typeof additionalArgs.progress === 'function'
+    const info = await new Promise(async (resolve) => {
 
         if (response) {
 
@@ -72,13 +74,13 @@ export const fetchRemote = async (url, options = {}, additionalArgs) => {
                     const chunk = value;
                     buffer.push(chunk);
 
-                    if (additionalArgs.progress instanceof Function) additionalArgs.progress(pathId, bytesReceived, bytes, null, null, response.headers.get('Range'))
+                    if (hasProgressFunction) additionalArgs.progress(pathId, bytesReceived, bytes, null, null, response.headers.get('Range'))
 
                     // Read some more, and call this function again
                     return reader.read().then(processBuffer)
                 }
 
-                reader.read().then(processBuffer);
+                reader.read().then(processBuffer)
             }
 
         } else {
@@ -93,7 +95,7 @@ export const fetchRemote = async (url, options = {}, additionalArgs) => {
         ...info
     }
 
-    if (additionalArgs.progress instanceof Function) {
+    if (hasProgressFunction) {
         const status = [null, null]
         if (response.ok) status[0] = output
         else status[1] = output

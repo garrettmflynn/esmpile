@@ -12,17 +12,17 @@ This library allows for you to **compile ESM source files** using standard impor
 ### The List of Options
 ```javascript
 const options = {
-    bundle: 'global', // Specify the bundle name to draw from
+    collection: 'global', // Specify the bundle name to draw from
     bundler: 'objecturl', // Specify how to bundle the file
     callbacks: {
-        onfile: (path, info) => {} // A callback for accumulating non-ESM bundle information (e.g. raw and compiled text, objecturl, datauri, etc.)
         progress: {
             fetch:(path, i, total, done, failed, range) => {}, // Fetch-level updates for each file
             file: (path, i, total, done, failed) => {} // File-level updates for each dependency resolution
         }
     },
+    circular: 'throw', // Handle circular references ('throw' is default, otherwise 'hide' and 'resolve' [not implemented])
     debug: true, // Toggle debug messages in the Developer Console 
-    dependencies: {}, // Extract a list of dependencies for each file using an empty object
+    forceNativeImport: false // Override output specifications which require text import
     output: { // Specify which information to output to the user
         text: true, // Use text for module creation and output using onImport
         objecturl: true,

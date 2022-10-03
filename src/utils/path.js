@@ -100,3 +100,5 @@ export const noBase = (path, opts, removeNode) => {
     }
 }
 
+export const pathId = (path, opts) => get(noBase(path,opts))
+
