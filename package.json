@@ -1,6 +1,6 @@
 {
   "name": "esmpile",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "Compile ESM source files on the browser",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
