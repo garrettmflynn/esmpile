@@ -1,15 +1,28 @@
 // Node Polyfills
-export const ready = new Promise(async (resolve, reject) => {
+
+export let fetch;
+export let fs;
+export let Blob;
+
+const isReady = new Promise(async (resolve, reject) => {
+
     try {
         if (typeof process === 'object') { //indicates node
-            globalThis.REMOTEESM_NODE = true
-            globalThis.fetch = (await import('node-fetch')).default
-            if (typeof globalThis.fetch !== 'function') globalThis.fetch = fetch
 
-            const Blob = (await import('cross-blob')).default
-            globalThis.Blob = Blob
+            // Fetch
+            if (!fetch) {
+                globalThis.REMOTEESM_NODE = true
+                fetch = globalThis.fetch = (await import('node-fetch')).default
+                if (typeof globalThis.fetch !== 'function') globalThis.fetch = fetch
+            }
+            // FS
+            if (!fs) fs = globalThis.fs = (await import('fs')).default
 
-            if (typeof globalThis.Blob !== 'function') globalThis.Blob = Blob
+            // Blob
+            if (!Blob) {
+                const buffer = (await import('node:buffer')).default
+                Blob = globalThis.Blob = buffer.Blob
+            }
             resolve(true)
         } else resolve(true)
 
@@ -17,3 +30,5 @@ export const ready = new Promise(async (resolve, reject) => {
         reject(err)
     }
 })
+
+export const ready = isReady

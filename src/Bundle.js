@@ -16,7 +16,7 @@ const noEncoding = `No buffer or text to bundle for`
 // Import ES6 Modules (and replace their imports with actual file imports!)
 // TODO: Handle exports without stalling...
 // const re = /[^\n]*(?<![\/\/])(import|export)\s+([ \t]*(?:(?:\* (?:as .+))|(?:[^ \t\{\}]+[ \t]*,?)|(?:[ \t]*\{(?:[ \t]*[^ \t"'\{\}]+[ \t]*,?)+\}))[ \t]*)from[ \t]*(['"])([^'"\n]+)(?:['"])([ \t]*assert[ \t]*{[ \n\t]*type:[ \n\t]*(['"])([^'"\n]+)(?:['"])[\n\t]*})?/gm
-const re = /[^\n]*(?<![\/\/])(import)\s+([ \t]*(?:(?:\* (?:as .+))|(?:[^ \t\{\}]+[ \t]*,?)|(?:[ \t]*\{(?:[ \t]*[^ \t"'\{\}]+[ \t]*,?)+\}))[ \t]*)from[ \t]*(['"])([^'"\n]+)(?:['"])([ \t]*assert[ \t]*{[ \n\t]*type:[ \n\t]*(['"])([^'"\n]+)(?:['"])[\n\t]*})?/gm
+const re = /[^\n]*(?<![\/\/])(import)\s+([ \t]*(?:(?:\* (?:as .+))|(?:[^ \t\{\}]+[ \t]*,?)|(?:[ \t]*\{(?:[ \t]*[^ \t"'\{\}]+[ \t]*,?)+\}))[ \t]*)from[ \t]*(['"])([^'"\n]+)(?:['"])([ \t]*assert[ \t]*{[ \n\t]*type:[ \n\t]*(['"])([^'"\n]+)(?:['"])[\n\t]*})?;?/gm
 export function get(url, opts=this.options){
     const pathId = (url) ? pathUtils.pathId(url, opts) : undefined // Set Path ID
     let ref = globalThis.REMOTEESM_BUNDLES[opts.collection]
@@ -59,19 +59,17 @@ export default class Bundle {
 
             this.#options = opts
 
-            const output = opts.output ?? {}
+            if (!opts.output) opts.output = {}
+
+            // ------------------- Set Bundler -------------------
+            this.bundler = opts.bundler
 
             // ------------------- Set Bundle Collection -------------------
             this.updateCollection(this.options.collection)
 
             // ------------------- Derived Properties -------------------
-            this.derived.direct = opts.forceNativeImport || (!output.text && !output.datauri && !output.objecturl)
+            if (typeof opts?.callbacks?.progress?.file === 'function') this.callbacks.file = opts.callbacks.progress.file
 
-            if (typeof opts.callbacks.progress.file === 'function') this.callbacks.file = opts.callbacks.progress.file
-
-            // ------------------- Set Defaults -------------------
-            if (!opts.bundler) opts.bundler = 'objecturl' // default bundler
-            this.bundler = opts.bundler
 
             // Default Fetch Options
             if (!opts.fetch) opts.fetch = {}
@@ -85,28 +83,50 @@ export default class Bundle {
     #bundler;
     get bundler() { return this.#bundler }
     set bundler(bundler) {
-        this.setBundler(bundler)
+        this.setBundleInfo(bundler)
+        this.setBundler(bundler, false)
     }
 
-    setBundler = async (bundler) => {
-        const innerInfo = this.#options._esmpile
+    setBundleInfo = (bundler) => {
+        this.#options._esmpile.lastBundler = this.#bundler
+        this.#bundler = this.#options.bundler = bundler
+
+        const output = this.#options.output
+        if (bundler) {
+            output[bundler] = true // default bundler option to true
+            output.text = true
+        }
+
+        this.derived.compile = !this.#options.forceNativeImport && (output.text || output.datauri || output.objecturl)
+    }
+
+    setBundler = async (bundler, setInfo = true) => {
+            if (setInfo) this.setBundleInfo(bundler)
+
+            const innerInfo = this.#options._esmpile
             const lastBundleType = innerInfo.lastBundle
 
+            const isSame = innerInfo.lastBundle === bundler
             if (
-                this.#bundler !== bundler  // if bundler has changed
-                || !lastBundleType // no last bundle type
+                !isSame  // if bundler has changed
+                || (innerInfo.lastBundle && isSame && !lastBundleType) // no last bundle type (when expected)
             ) {
-                this.#bundler = this.#options.bundler = bundler
+
                 const entrypoint = innerInfo.entrypoint
-                const entries = Array.from(this.dependencies.entries())
-                await Promise.all((entries).map(async ([_, entry]) => {
-                    entry.bundler = bundler
-                    await entry.result
-                })) // set bundler for all entries
-                
-                if (entrypoint?.status === 'success') {
-                    if (lastBundleType) this.encoded = await this.bundle(innerInfo.lastBundle) // resolve again
-                    else this.result = await this.resolve()
+                if (bundler) {
+                    const entries = Array.from(this.dependencies.entries())
+                    await Promise.all((entries).map(async ([_, entry]) => {
+                        entry.bundler = bundler
+                        await entry.result
+                    })) // set bundler for all entries
+                }
+
+                const isComplete = ['success', 'failed']
+                if (isComplete.includes(entrypoint?.status)) {
+
+                    if (!bundler) this.result = await this.resolve() // Direct Import
+                    else if (lastBundleType) this.encoded = await this.bundle(lastBundleType) // Swap Bundler Type
+                    else this.result = await this.resolve() // Full Resolution
                 }
             }
     }
@@ -212,7 +232,7 @@ export default class Bundle {
     }
 
     derived = {
-        direct: undefined,
+        compile: false,
         dependencies: {n: 0, resolved: 0}
     }
 
@@ -226,7 +246,7 @@ export default class Bundle {
 
         this.status = 'importing'
 
-         const info = await response.findModule(this.url, this.options).catch((e) => {})
+         const info = await response.findModule(this.url, this.options)
          
          // Direct import was successful
          if (info?.result) return info.result
@@ -259,20 +279,38 @@ export default class Bundle {
             catch (e) {
 
                 // ------------------- Get Import Details -------------------
-                this.imports = []
+                this.imports = {} // permanent collection of imports
+                const imports = [] // temporary
                 const matches = Array.from(this.info.text.updated.matchAll(re))
                 matches.forEach(([original, prefix, command, delimiters, path]) => {
 
                     if (path){
-                        this.info.text.updated = this.info.text.updated.replace(original, ``); // Replace found text
                         const wildcard = !!command.match(/\*\s+as/);
                         const variables = command.replace(/\*\s+as/, "").trim();
-                        this.imports.push({
+
+                        const absolutePath = pathUtils.absolute(path)
+                        let name = (absolutePath) ? path : pathUtils.get(path, this.url);
+                        const absNode = nodeModules.path(this.options)
+                        name = name.replace(`${absNode}/`, '')
+    
+                        const info = {
+                            name,
                             path,
                             prefix,
                             variables,
-                            wildcard
-                        });
+                            wildcard,
+                            current: {
+                                line: original,
+                                path
+                            },
+                            original,
+                            counter: 0,
+                            bundle: null
+                        }
+            
+                        if (!this.imports[name]) this.imports[name] = [];
+                        this.imports[name].push(info)
+                        imports.push(info)
                     }
                 })
 
@@ -280,12 +318,13 @@ export default class Bundle {
                 this.derived.dependencies.n = this.imports.length
 
                 // ------------------- Import Files Asynchronously -------------------
-                const promises = this.imports.map(async (info) => {
-                     await this.importDependency(info)
+                const promises = imports.map(async (info, i) => {
+                    await this.updateImport(info, i)
                     this.derived.dependencies.resolved++
                 })
 
                 await Promise.all(promises)
+
                 this.text = this.info.text.updated // trigger recompilation from text
             }
 
@@ -300,19 +339,68 @@ export default class Bundle {
         return this.result
     }
 
-    importDependency = async (info) => {
-        const { prefix, variables, wildcard } = info;
-        let path = info.path
-        const absolutePath = pathUtils.absolute(path)
-        
-            let correctPath = (absolutePath) ? path : pathUtils.get(path, this.url);
+    updateImportPath = (info, encoded) => {
+        if (encoded === info.current.path) return
 
-            // Correct the Correct Path
-            const absNode = nodeModules.path(this.options)
-            correctPath = correctPath.replace(`${absNode}/`, '')
-    
+        const { prefix, variables, wildcard, bundle } = info;
+
+        let newImport = '';
+        // ----------- Native Imports -----------
+        if (typeof encoded === "string") {
+            newImport = `${prefix} ${wildcard ? "* as " : ""}${variables} from "${encoded}"; // Imported from ${bundle.name}\n\n`
+
+            // // ----------- Dynamic Imports -----------
+            // const replaced = variables.replace('{', '').replace('}', '')
+            // const exportDefault = (replaced === variables) ? true : false
+            // const splitVars = variables.replace('{', '').replace('}', '').split(',').map(str => str.trim())
+
+            // const insertVariable = (variable, j) => {
+            //     let end = ''
+            //     if (!wildcard) {
+            //         if (exportDefault) end = `.default`
+            //         else end = `.${variable}`
+            //     }
+
+            //     const randomVarName = `remoteesm_datauri_${i}_${j}`
+            //     const encodedSplit = encoded.match(/.{1,100}/g)
+            //     this.info.text.updated = `const ${randomVarName} = ${JSON.stringify(encodedSplit)};\n\n${prefix === 'import' ? '' : 'export '}const ${variable} = (await import(${randomVarName}.join('')))${end};\n\n${this.info.text.updated}`;
+            // }
+
+            // splitVars.forEach(insertVariable)
+        }
+
+        // ----------- Passed by Reference (e.g. fallbacks) -----------
+        else {
+            
+            const replaced = variables.replace('{', '').replace('}', '')
+            const exportDefault = (replaced === variables) ? true : false
+            const splitVars = variables.replace('{', '').replace('}', '').split(',').map(str => str.trim())
+
+            const insertVariable = (variable) => {
+                let end = ''
+                if (!wildcard) {
+                    if (exportDefault) end = `.default`
+                    else end = `.${variable}`
+                }
+                newImport += `${prefix === 'import' ? '' : 'export '}const ${variable} = (await globalThis.REMOTEESM_BUNDLES["${bundle.collection}"]["${bundle.name}"].result)${end};\n\n`;
+            }
+
+            splitVars.forEach(insertVariable)
+        }
+
+        this.info.text.updated = this.info.text.updated.replace(info.current.line, newImport)
+        info.current.line = newImport
+        info.current.path = encoded
+
+    }
+
+    updateImport = async (info) => {
+            let path = info.path        
+            let correctPath = info.name
+
             // Get Dependency Bundle
             const bundle = this.get(correctPath) 
+            info.bundle = bundle
 
             this.addDependency(bundle)
     
@@ -322,40 +410,13 @@ export default class Bundle {
                 options.output.text = true // import from text
                 const newBundle = await this.get(correctPath, options)
                 await newBundle.resolve(path)
-            } else {
-                await bundle.result // wait for bundle to resolve
-            }
+            } else await bundle.result // wait for bundle to resolve
     
             // Update Original Input Texts
             const encoded = await bundle.encoded 
 
-            if (typeof encoded === "string") {
-                this.info.text.updated = `
-                ${prefix} ${wildcard ? "* as " : ""}${variables} from "${encoded}"; // Imported from ${bundle.name}
-                ${this.info.text.updated}`;
-            }
-    
-            // Passed by Reference (e.g. fallbacks)
-            else {
-                
-                const replaced = variables.replace('{', '').replace('}', '')
-                const exportDefault = (replaced === variables) ? true : false
-                const splitVars = variables.replace('{', '').replace('}', '').split(',').map(str => str.trim())
+            this.updateImportPath(info, encoded)
 
-                const insertVariable = (variable) => {
-                    let end = ''
-                    if (!wildcard) {
-                        if (exportDefault) end = `.default`
-                        else end = `.${variable}`
-                    }
-                    this.info.text.updated = `
-                    ${prefix === 'import' ? '' : 'export '}const ${variable} = (await globalThis.REMOTEESM_BUNDLES["${bundle.collection}"]["${bundle.name}"].result)${end};
-                    ${this.info.text.updated}`;
-                }
-
-                splitVars.forEach(insertVariable)
-            }
-    
             return bundle
     }
 
@@ -400,10 +461,11 @@ export default class Bundle {
                 // Encode into a datauri and/or objecturl
                 const encodings = []
                 const output = this.options.output
-                if (output?.datauri || this.bundler === 'datauri') encodings.push('datauri')
-                if (output?.objecturl || this.bundler === 'objecturl') encodings.push('objecturl')
+                if (output?.datauri) encodings.push('datauri')
+                if (output?.objecturl) encodings.push('objecturl')
                 for (let i in encodings) {
                     const encoding = encodings[i]
+
                     const encodedInfo = await encode[encoding](bufferOrText, this.url, mimeType)
 
                     if (encodedInfo) {
@@ -412,8 +474,12 @@ export default class Bundle {
                     }
                 }
 
-                const options = [this.encodings.datauri, this.encodings.objecturl]
-                const encoded = (this.bundler === 'objecturl') ? options[1] ?? options[0] : options[0] ?? options[1]
+                const encoded = (this.bundler === 'objecturl') ? this.encodings.objecturl : this.encodings.datauri
+
+                // Updating dependencies
+                const promises = Array.from(this.dependents.values()).map(dep => dep.updateDependency(this, encoded))
+                await Promise.all(promises)
+
                 resolve(encoded)
             } catch (e) {
                 reject(e)
@@ -448,6 +514,11 @@ export default class Bundle {
         o.dependents.delete(this.name)
     }
 
+    updateDependency = async (o, encoding) => {
+        const infoArr = this.imports[o.url]
+        infoArr.forEach(info => this.updateImportPath(info, encoding))
+    }
+
     // ------------------- Additional Helpers ------------------- //
     updateCollection = (collection) => {
         if (!collection) {
@@ -456,35 +527,48 @@ export default class Bundle {
     }
 
     // ------------------- Download Bundle ------------------- //
-    download = () => {
-            let objecturl = this.encodings.objecturl
+    download = async (path=this.filename) => {
 
-            if (this.bundler === 'datauri') {
-                const mime = this.encodings.datauri.split(',')[0].split(':')[1].split(';')[0];
-                const binary = atob(this.encodings.datauri.split(',')[1]);
-                const array = [];
-                for (var i = 0; i < binary.length; i++) {
-                array.push(binary.charCodeAt(i));
-                }
-                const blob = new Blob([new Uint8Array(array)], {type: mime});
-                objecturl = URL.createObjectURL(blob)
+        if (this.bundler === 'datauri') {
+
+             // Convert to ObjectURL
+             const mime = this.encodings.datauri.split(',')[0].split(':')[1].split(';')[0];
+             const binary = atob(this.encodings.datauri.split(',')[1]);
+             const array = [];
+             for (var i = 0; i < binary.length; i++) {
+             array.push(binary.charCodeAt(i));
+             }
+
+             const buffer = new Uint8Array(array)
+             const blob = new Blob([buffer], {type: mime});
+             const objecturl = URL.createObjectURL(blob)
+
+            // Download to your filesystem
+            if (globalThis.REMOTEESM_NODE){
+                await polyfills.ready
+                globalThis.fs.writeFileSync(path, buffer)
+                console.log(`Wrote bundle contents to ${path}`)
+            } 
+            
+            // Download from the browser
+            else {
+
+                // Download on the Browser
+                var a = document.createElement("a");
+                document.body.appendChild(a);
+                a.style = "display: none";
+                a.href = objecturl;
+                a.download = path;
+                a.click();
             }
-
-
-
-            var a = document.createElement("a");
-            document.body.appendChild(a);
-            a.style = "display: none";
-            a.href = objecturl;
-            a.download = this.filename;
-            a.click();
+        } else console.log('Incorrect bundler type for download. Please use the "datauri" bundler.')
     }
 
     // ------------------- Handle Circular References ------------------- //
     circular = async (o) => {
         const result = await this.resolve().catch((e) => {
-            console.warn(`Circular dependency detected: Fallback to direct import for ${this.url} failed...`)
-            const message = `Circular dependency detected: ${this.uri} <-> ${o.uri}.`
+            console.warn(`Circular dependency detected: Fallback to direct import for ${this.url} failed...`, e)
+            const message = `Circular dependency cannot be resolved: ${this.uri} <-> ${o.uri}.`
             throw new Error(message)
         })
 
@@ -504,10 +588,13 @@ export default class Bundle {
             let result;
 
             const isCircular = this.options._esmpile.circular.has(this.url)
-            let isDirect = isCircular || this.derived.direct
+            let isDirect = isCircular || !this.derived.compile
+
             try {
+
+                result = (isDirect) ? await this.import() : undefined // try to import natively
+
                 try {
-                    result = (isDirect) ? await this.import() : undefined // try to import natively
                     if (!result) {
                         if (isCircular) throw new Error(`Failed to import ${this.url} natively.`)
                         else result = await this.compile() // fallback to text compilation

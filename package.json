@@ -15,7 +15,9 @@
   ],
   "scripts": {
     "start": "tinybuild",
-    "build": "tinybuild bundle"
+    "build": "tinybuild bundle",
+    "bundle": "node ./bundle.js"
+
   },
   "devDependencies": {
     "device-decoder": "^0.2.17",

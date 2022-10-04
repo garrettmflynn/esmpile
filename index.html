@@ -328,16 +328,15 @@
     const wavFile = './tests/kalimba.wav'
 
 
+    const bundled = './tests/bundled/index.esmpile.js'
+
     // ---------------- Set Options ----------------
     const options = {}
 
     options.relativeTo = import.meta.url // Ensure appropriate relative paths are used
     options.collection = null //'global' // Specify which bundle to reference. Specify 'global' to use same bundle across all imports. Don't specify to create a new bundle
-    options.bundler = 'objecturl' // Specify what sort of link to import with | Can be 'datauri' (saveable) or 'objecturl' (runtime only)
     options.debug = false // Show debug messages
     options.callbacks = {progress: {}}
-    options.circular = 'throw' // 'hide', 'resolve' (not implemented)
-
 
     const forEachFile = async (bundle) => {
 
@@ -362,7 +361,7 @@
         }
 
         //---------------- Import Self and Use That as the Core Library ----------------
-        if (bundle.uri === selfURI) esm = result
+        if (bundle.uri === selfURI || bundle.uri === bundled) esm = result
 
         // Resolve a Source Map
 
@@ -393,32 +392,11 @@
         if (bundle.uri === wavFile) {
             const audio = document.createElement('audio')
             audio.autoplay = true
-            console.log('encoded', encoded)
             audio.src = await encoded
             audio.onended = () => {
                 audio.remove()
             }
         }
-    }
-
-    // ---------------- Test Bundles ----------------
-    // const res = await esm.compile('./tests/bundled/device.frontend.esm.esmpile.js', options)
-    // const worker = await esm.compile('./tests/bundled/stream.big.worker.esmpile.js', options)
-
-    const compileOpts = { 
-        bundler: 'objecturl', // Toggle between this more naturally...
-        output: {
-            text: true,
-            objecturl: true // allow links
-        } 
-    }
-
-    const bundleOpts = { 
-        bundler: 'datauri', // Toggle between this more naturally...
-        output: {
-            text: true,
-            objecturl: true // allow links
-        } 
     }
 
     const tests = {
@@ -450,6 +428,10 @@
 
         wav: {
             uri: wavFile
+        },
+
+        bundled: {
+            uri: bundled
         },
     }
 
@@ -528,9 +510,9 @@
 
             } else {
                 
-                const bundler = fullOptions.bundler
-                delete fullOptions.bundler
                 // Resetting Bundler Options
+                const bundler = fullOptions.bundler
+                fullOptions.bundler = test.bundle.bundler // ignore change...
                 try {
                     test.bundle.options = fullOptions
                     await test.bundle.setBundler(bundler) // ensure you can wait
@@ -543,7 +525,10 @@
 
             // await test.bundle.encoded
             const result = await test.bundle.result
-            if (result !== undefined) display.progress.classList.add('resolved')
+            if (result !== undefined) {
+                display.error.style.display = "none"
+                display.progress.classList.add('resolved')
+            }
 
             const toc = performance.now()
             display.time.innerHTML = `${(toc-tic).toFixed(3)}ms`
@@ -555,11 +540,13 @@
         }
 
         display.buttons.direct.onclick = () => onClick()
-        display.buttons.compile.onclick = () => onClick(compileOpts)
-        display.buttons.bundle.onclick = () => onClick(bundleOpts)
+        display.buttons.compile.onclick = () => onClick({ bundler: 'objecturl' })
+        display.buttons.bundle.onclick = () => onClick({ bundler: 'datauri' })
 
 
-        if (label === 'self') display.buttons.direct.click() // auto-import self
+        // if (label === 'self') display.buttons.direct.click() // auto-import self
+        if (label === 'bundled') display.buttons.direct.click() // auto-import self
+
     }
 
 

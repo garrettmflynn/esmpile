@@ -20,7 +20,6 @@ const options = {
             file: (path, i, total, done, failed) => {} // File-level updates for each dependency resolution
         }
     },
-    circular: 'throw', // Handle circular references ('throw' is default, otherwise 'hide' and 'resolve' [not implemented])
     debug: true, // Toggle debug messages in the Developer Console 
     forceNativeImport: false // Override output specifications which require text import
     output: { // Specify which information to output to the user
