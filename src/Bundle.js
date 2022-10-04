@@ -340,8 +340,8 @@ export default class Bundle {
     }
 
     updateImportPath = (info, encoded) => {
+        
         if (encoded === info.current.path) return
-
         const { prefix, variables, wildcard, bundle } = info;
 
         let newImport = '';
@@ -529,39 +529,38 @@ export default class Bundle {
     // ------------------- Download Bundle ------------------- //
     download = async (path=this.filename) => {
 
-        if (this.bundler === 'datauri') {
+        if (this.bundler != 'datauri') await this.setBundler('datauri') // ensure that you can download
 
-             // Convert to ObjectURL
-             const mime = this.encodings.datauri.split(',')[0].split(':')[1].split(';')[0];
-             const binary = atob(this.encodings.datauri.split(',')[1]);
-             const array = [];
-             for (var i = 0; i < binary.length; i++) {
-             array.push(binary.charCodeAt(i));
-             }
+        // Convert to ObjectURL
+        const mime = this.encodings.datauri.split(',')[0].split(':')[1].split(';')[0];
+        const binary = atob(this.encodings.datauri.split(',')[1]);
+        const array = [];
+        for (var i = 0; i < binary.length; i++) {
+        array.push(binary.charCodeAt(i));
+        }
 
-             const buffer = new Uint8Array(array)
-             const blob = new Blob([buffer], {type: mime});
-             const objecturl = URL.createObjectURL(blob)
+        const buffer = new Uint8Array(array)
+        const blob = new Blob([buffer], {type: mime});
+        const objecturl = URL.createObjectURL(blob)
 
-            // Download to your filesystem
-            if (globalThis.REMOTEESM_NODE){
-                await polyfills.ready
-                globalThis.fs.writeFileSync(path, buffer)
-                console.log(`Wrote bundle contents to ${path}`)
-            } 
-            
-            // Download from the browser
-            else {
+        // Download to your filesystem
+        if (globalThis.REMOTEESM_NODE){
+            await polyfills.ready
+            globalThis.fs.writeFileSync(path, buffer)
+            console.log(`Wrote bundle contents to ${path}`)
+        } 
+        
+        // Download from the browser
+        else {
 
-                // Download on the Browser
-                var a = document.createElement("a");
-                document.body.appendChild(a);
-                a.style = "display: none";
-                a.href = objecturl;
-                a.download = path;
-                a.click();
-            }
-        } else console.log('Incorrect bundler type for download. Please use the "datauri" bundler.')
+            // Download on the Browser
+            var a = document.createElement("a");
+            document.body.appendChild(a);
+            a.style = "display: none";
+            a.href = objecturl;
+            a.download = path;
+            a.click();
+        }
     }
 
     // ------------------- Handle Circular References ------------------- //
@@ -592,7 +591,10 @@ export default class Bundle {
 
             try {
 
-                result = (isDirect) ? await this.import() : undefined // try to import natively
+                result = (isDirect) ? await this.import().catch(async e => {
+                    if (this.#options.fallback === false) throw e
+                    else await this.setBundler('objecturl') // fallback to objecturl
+                }) : undefined // try to import natively
 
                 try {
                     if (!result) {

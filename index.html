@@ -223,14 +223,12 @@
             buttonDiv.classList.add('buttons')
             const button = document.createElement('button')
             const compile = document.createElement('button')
-            const bundle = document.createElement('button')
 
             h2.innerText = label
             pathEl.innerText = info.uri
 
             button.innerText = 'Import'
             compile.innerText = 'Compile'
-            bundle.innerText = 'Bundle'
 
             headerDiv.appendChild(progressCircle)
             headerDiv.appendChild(h2Div)
@@ -239,7 +237,6 @@
 
             buttonDiv.appendChild(button)
             buttonDiv.appendChild(compile)
-            buttonDiv.appendChild(bundle)
 
             header.appendChild(headerDiv)
             header.appendChild(buttonDiv)
@@ -257,7 +254,6 @@
                 buttons: {
                     direct: button,
                     compile,
-                    bundle
                 },
                 error,
                 entries: {}
@@ -337,6 +333,7 @@
     options.collection = null //'global' // Specify which bundle to reference. Specify 'global' to use same bundle across all imports. Don't specify to create a new bundle
     options.debug = false // Show debug messages
     options.callbacks = {progress: {}}
+    options.fallback = false
 
     const forEachFile = async (bundle) => {
 
@@ -346,7 +343,6 @@
         const result = await bundle.result
         const encoded = await bundle.encoded
 
-        // Can be downloaded
         const entriesForPath = entries[path]
         if (entriesForPath) {
             entriesForPath.forEach(entry => {
@@ -354,9 +350,9 @@
 
                 // Can be accessed with a link
                 if (bundle.encodings.objecturl)  entry.name.innerHTML = `<a href="${bundle.encodings.objecturl}" target="_blank">${path}</a>`
-               
-                // Can be downloaded
-                if (bundle.encodings.datauri) entry.download.classList.remove('inactive') // activate download button
+
+                entry.download.classList.remove('inactive') // activate download button
+
             }) // Provide a link
         }
 
@@ -452,6 +448,12 @@
     if (hasNodeModules) Object.assign(tests, dependsOnNodeModules)
     else console.warn('node_modules folder has not been found. Tests that rely on node_modules have been removed...', dependsOnNodeModules)
 
+
+    const verbs = {
+        default: 'Import',
+        objecturl: 'Compil',
+        datauri: 'Bundl'
+    }
     
     // ---------------- Run Tests ----------------
     for (let label in tests) {
@@ -482,7 +484,10 @@
             // Specify Callbacks Internally (to update ui)
             options.callbacks.progress.file = (path, i, total, done, failed) => {
                 if (!entries[path]) createEntry(path, display)
-                if (done) entries[path].status.innerText = `Resolved`
+                if (done) {
+                    const verb = verbs[done.bundler] ?? verbs.default
+                    entries[path].status.innerText = `${verb}ed`
+                }
                 else if (failed) handleFailed(path, failed)
                 else handleProcess(path, i, total, null, `Resolving`)
             }
@@ -541,12 +546,8 @@
 
         display.buttons.direct.onclick = () => onClick()
         display.buttons.compile.onclick = () => onClick({ bundler: 'objecturl' })
-        display.buttons.bundle.onclick = () => onClick({ bundler: 'datauri' })
 
-
-        // if (label === 'self') display.buttons.direct.click() // auto-import self
-        if (label === 'bundled') display.buttons.direct.click() // auto-import self
-
+        if (label === 'self') display.buttons.direct.click() // auto-import self
     }
 
 

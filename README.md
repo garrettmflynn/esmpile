@@ -21,6 +21,7 @@ const options = {
         }
     },
     debug: true, // Toggle debug messages in the Developer Console 
+    fallback: true, // Toggle to fallback to compilation if direct import is not available
     forceNativeImport: false // Override output specifications which require text import
     output: { // Specify which information to output to the user
         text: true, // Use text for module creation and output using onImport
