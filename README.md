@@ -28,7 +28,8 @@ const options = {
         objecturl: true,
         datauri: true
     },
-    relativeTo: import.meta.url // Specify what file the paths are relative to.
+    relativeTo: import.meta.url // Specify what file the paths are relative to. 
+    // If using a bundler for your main JavaScript file, you may have to substitute with window.location.href...
 }
 
 ```

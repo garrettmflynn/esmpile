@@ -37,11 +37,14 @@ export default class Bundle {
     #url 
     get url() { return this.#url }
     set url(url) {
-        this.#url = url
         const ESMPileInternalOpts = this.options._esmpile
         if (!ESMPileInternalOpts.entrypoint) ESMPileInternalOpts.entrypoint = this
 
         if (!this.uri) this.uri = url // set original uri
+
+        // Transform for absolute targeting
+        if (!url.includes(this.#options.relativeTo)) url = pathUtils.get(url, this.#options.relativeTo)
+        this.#url = url
         const pathId = pathUtils.pathId(this.url, this.options)
         if (this.name !== pathId) this.name = pathId // derive a name
         this.updateCollection(this.options.collection)
