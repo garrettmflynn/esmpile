@@ -236,10 +236,10 @@ export default class Bundle {
         dependencies: {n: 0, resolved: 0}
     }
 
-    constructor(url, options={}) {
+    constructor(entrypoint, options={}) {
 
         this.options = options
-        this.url = url
+        this.url = entrypoint
     }
 
     import = async () => {
