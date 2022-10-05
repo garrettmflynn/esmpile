@@ -43,7 +43,8 @@ export default class Bundle {
         if (!this.uri) this.uri = url // set original uri
 
         // Transform for absolute targeting
-        if (!url.includes(this.#options.relativeTo)) url = pathUtils.get(url, this.#options.relativeTo)
+        const isAbsolute = pathUtils.absolute(url, true)
+        if (!isAbsolute && !url.includes(this.#options.relativeTo)) url = pathUtils.get(url, this.#options.relativeTo)
         this.#url = url
         const pathId = pathUtils.pathId(this.url, this.options)
         if (this.name !== pathId) this.name = pathId // derive a name
@@ -322,7 +323,7 @@ export default class Bundle {
 
                 // ------------------- Import Files Asynchronously -------------------
                 const promises = imports.map(async (info, i) => {
-                    await this.updateImport(info, i)
+                    await this.setImport(info, i)
                     this.derived.dependencies.resolved++
                 })
 
@@ -342,7 +343,7 @@ export default class Bundle {
         return this.result
     }
 
-    updateImportPath = (info, encoded) => {
+    updateImport = (info, encoded) => {
         
         if (encoded === info.current.path) return
         const { prefix, variables, wildcard, bundle } = info;
@@ -397,7 +398,7 @@ export default class Bundle {
 
     }
 
-    updateImport = async (info) => {
+    setImport = async (info) => {
             let path = info.path        
             let correctPath = info.name
 
@@ -418,7 +419,7 @@ export default class Bundle {
             // Update Original Input Texts
             const encoded = await bundle.encoded 
 
-            this.updateImportPath(info, encoded)
+            this.updateImport(info, encoded)
 
             return bundle
     }
@@ -480,8 +481,8 @@ export default class Bundle {
                 const encoded = (this.bundler === 'objecturl') ? this.encodings.objecturl : this.encodings.datauri
 
                 // Updating dependencies
-                const promises = Array.from(this.dependents.values()).map(dep => dep.updateDependency(this, encoded))
-                await Promise.all(promises)
+                // const promises = Array.from(this.dependents.values()).map(dep => dep.updateDependency(this, encoded))
+                // await Promise.all(promises)
 
                 resolve(encoded)
             } catch (e) {
@@ -505,8 +506,6 @@ export default class Bundle {
 
         // Abort for circular references before waiting
         if(foundCircular) {
-            this.options._esmpile.circular.add(this.url, o.url)
-            this.options._esmpile.circular.add(o.url)
             this.circular(o)
             o.circular(this)
         }
@@ -519,7 +518,7 @@ export default class Bundle {
 
     updateDependency = async (o, encoding) => {
         const infoArr = this.imports[o.url]
-        infoArr.forEach(info => this.updateImportPath(info, encoding))
+        infoArr.forEach(info => this.updateImport(info, encoding))
     }
 
     // ------------------- Additional Helpers ------------------- //
@@ -568,6 +567,8 @@ export default class Bundle {
 
     // ------------------- Handle Circular References ------------------- //
     circular = async (o) => {
+        this.options._esmpile.circular.add(this.url) // add self
+
         const result = await this.resolve().catch((e) => {
             console.warn(`Circular dependency detected: Fallback to direct import for ${this.url} failed...`, e)
             const message = `Circular dependency cannot be resolved: ${this.uri} <-> ${o.uri}.`
