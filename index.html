@@ -173,7 +173,10 @@
 </body>
 <script type="module">
 
+    console.error('TEST THROW')
     import * as library from './src/index.js';
+    // import * as library from './dist/index.esm.js';
+    console.error('LIBRARY LOADED')
 
     let esm = library
 
