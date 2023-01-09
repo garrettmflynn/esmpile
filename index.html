@@ -174,7 +174,6 @@
 <script type="module">
 
     import * as library from './src/index.js';
-    // import * as library from './dist/index.esm.js';
 
     let esm = library
 
@@ -409,10 +408,6 @@
         //---------------- Test Source Map Resolution for Self Distribution ----------------
         sourcemap: {
             uri: sourceURI
-        },
-
-        remote: {
-            uri: 'https://raw.githubusercontent.com/garrettmflynn/esmpile/main/src/index.js'
         },
 
         executable: {

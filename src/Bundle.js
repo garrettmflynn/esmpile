@@ -7,11 +7,19 @@ import * as nodeModules from './utils/nodeModules.js'
 import * as errors from './utils/errors.js'
 import * as polyfills from './utils/polyfills.js'
 import * as sourceMap from './utils/sourceMap.js';
+import { esSourceKey } from '../spec/properties.js';
 
 if (!globalThis.REMOTEESM_BUNDLES) globalThis.REMOTEESM_BUNDLES = {global: {}} // Share references between loaded dataurl instances
 const global = globalThis.REMOTEESM_BUNDLES.global
 
 const noEncoding = `No buffer or text to bundle for`
+
+const toWait = 10000
+const waitedFor = (toWait/1000).toFixed(1)
+
+const esSourceString = (bundle) => `
+export const ${esSourceKey} = () => globalThis.REMOTEESM_BUNDLES["${bundle.collection}"]["${bundle.name}"];
+` // Export bundle from module...
 
 // Import ES6 Modules (and replace their imports with actual file imports!)
 // TODO: Handle exports without stalling...
@@ -27,10 +35,21 @@ export function get(url, opts=this.options){
     return bundle
 }
 
+const promiseInfo = {
+    resolve: undefined,
+    reject: undefined,
+    promise: undefined
+}
+
 
 export default class Bundle {
 
     filename = 'bundle.esmpile.js'
+
+    promises = {
+        encoded: Object.assign({},promiseInfo),
+        result: Object.assign({},promiseInfo)
+    }
 
     uri;
 
@@ -119,15 +138,21 @@ export default class Bundle {
                 const entrypoint = innerInfo.entrypoint
                 if (bundler) {
                     const entries = Array.from(this.dependencies.entries())
-                    await Promise.all((entries).map(async ([_, entry]) => {
-                        entry.bundler = bundler
-                        await entry.result
-                    })) // set bundler for all entries
+
+                    if (entries.length) {
+                        await Promise.all((entries).map(async ([_, entry]) => {
+                            entry.bundler = bundler
+                            await entry.result
+                        })) // set bundler for all entries
+                    }
+
+                    // console.warn('Awaited all!', this.uri)
+
                 }
 
                 const isComplete = ['success', 'failed']
                 if (isComplete.includes(entrypoint?.status)) {
-
+                    // console.log('Creating a promise')
                     if (!bundler) this.result = await this.resolve() // Direct Import
                     else if (lastBundleType) this.encoded = await this.bundle(lastBundleType) // Swap Bundler Type
                     else this.result = await this.resolve() // Full Resolution
@@ -188,7 +213,9 @@ export default class Bundle {
     // Update Bundle
     #text
     #buffer
-    get text() {return this.#text}
+    get text() {
+        return this.#text ?? this.info.text.original
+    }
     set text(text) {
         this.#text = text
         this.encoded = this.bundle('text').catch(e => { 
@@ -251,6 +278,7 @@ export default class Bundle {
         this.status = 'importing'
 
          const info = await response.findModule(this.url, this.options)
+        
          
          // Direct import was successful
          if (info?.result) return info.result
@@ -282,13 +310,14 @@ export default class Bundle {
             // ------------------- Replace Nested Imports -------------------
             catch (e) {
 
+                // console.warn('initial error', e)
+
                 // ------------------- Get Import Details -------------------
                 this.imports = {} // permanent collection of imports
                 const imports = [] // temporary
                 const matches = Array.from(this.info.text.updated.matchAll(re))
-                matches.forEach((matchInfo) => {
+                matches.forEach(([original, before, prefix, command, delimiters, path]) => {
 
-                    const [original, before, prefix, command, delimiters, path] = matchInfo
                     if (before.includes('//')) return; // No comments
 
                     if (path){
@@ -338,6 +367,7 @@ export default class Bundle {
         } 
         // ------------------- Catch Aborted Requests -------------------
         catch (e) {
+            // console.log('compile error', e)
             throw e
         }
 
@@ -353,28 +383,7 @@ export default class Bundle {
 
         let newImport = '';
         // ----------- Native Imports -----------
-        if (typeof encoded === "string") {
-            newImport = `${prefix} ${wildcard ? "* as " : ""}${variables} from "${encoded}"; // Imported from ${bundle.name}\n\n`
-
-            // // ----------- Dynamic Imports -----------
-            // const replaced = variables.replace('{', '').replace('}', '')
-            // const exportDefault = (replaced === variables) ? true : false
-            // const splitVars = variables.replace('{', '').replace('}', '').split(',').map(str => str.trim())
-
-            // const insertVariable = (variable, j) => {
-            //     let end = ''
-            //     if (!wildcard) {
-            //         if (exportDefault) end = `.default`
-            //         else end = `.${variable}`
-            //     }
-
-            //     const randomVarName = `remoteesm_datauri_${i}_${j}`
-            //     const encodedSplit = encoded.match(/.{1,100}/g)
-            //     this.info.text.updated = `const ${randomVarName} = ${JSON.stringify(encodedSplit)};\n\n${prefix === 'import' ? '' : 'export '}const ${variable} = (await import(${randomVarName}.join('')))${end};\n\n${this.info.text.updated}`;
-            // }
-
-            // splitVars.forEach(insertVariable)
-        }
+        if (typeof encoded === "string") newImport = `${prefix} ${wildcard ? "* as " : ""}${variables} from "${encoded}"; // Imported from ${bundle.name}\n\n`
 
         // ----------- Passed by Reference (e.g. fallbacks) -----------
         else {
@@ -395,7 +404,9 @@ export default class Bundle {
             splitVars.forEach(insertVariable)
         }
 
+        // Update Line Text
         this.info.text.updated = this.info.text.updated.replace(info.current.line, newImport)
+
         info.current.line = newImport
         info.current.path = encoded
 
@@ -417,7 +428,23 @@ export default class Bundle {
                 options.output.text = true // import from text
                 const newBundle = await this.get(correctPath, options)
                 await newBundle.resolve(path)
-            } else await bundle.result // wait for bundle to resolve
+            } else {
+                // console.log('waiting...', this.uri, bundle.uri)
+
+                let done = false
+
+                setTimeout(() => {
+                    if (done) return
+                    console.error(`Took too long (${waitedFor}s)...`, bundle.uri)
+                    bundle.promises.result.reject()
+                    bundle.promises.encoded.reject()
+                }, toWait)
+                
+                await bundle.result // wait for bundle to resolve
+                // console.log('done!', this.uri, bundle.uri)
+                done = true
+
+            }
     
             // Update Original Input Texts
             const encoded = await bundle.encoded 
@@ -442,12 +469,16 @@ export default class Bundle {
     // Get Encoded Promise
     bundle = (type="buffer") => {
 
+        const isText = type === "text"
         this.options._esmpile.lastBundle = type // register last bundle type
-        return new Promise (async (resolve, reject) => {
+        this.promises.encoded.promise = new Promise (async (resolve, reject) => {
+
+            this.promises.encoded.resolve  = resolve
+            this.promises.encoded.reject  = reject
 
             try {
 
-            let bufferOrText = (type === 'text') ? this.info.text.updated :  this.buffer 
+            let bufferOrText = (isText) ? this.info.text.updated :  this.buffer 
 
                 if (!bufferOrText) {
                     if (this.info.fallback) this.encoded = this.info.fallback
@@ -462,6 +493,22 @@ export default class Bundle {
                         bufferOrText = compile.typescript(this.info, type)
                         mimeType = mimeTypes.js
                         break;
+                }
+
+                if (mimeType === mimeTypes.js) {
+                    // Always Add Custom Export
+                    const srcStr = esSourceString(this)
+
+                    let text = bufferOrText
+                    if (!isText) text = new TextDecoder().decode(bufferOrText)
+
+                    const update = !text.includes(srcStr)
+                    if (update) {
+                        text += srcStr
+                        this.info.text.updated = text
+                    }
+
+                    if (!isText) this.#buffer = bufferOrText = new TextEncoder().encode(text)
                 }
             
             
@@ -492,6 +539,8 @@ export default class Bundle {
                 reject(e)
             }
         })
+
+        return this.promises.encoded.promise
     }
 
     delete = () => {
@@ -589,7 +638,11 @@ export default class Bundle {
         this.encoded = undefined
 
         // define result promise
-        this.result = new Promise(async (resolve, reject) => {
+
+        this.result = this.promises.result.promise = new Promise(async (resolve, reject) => {
+
+            this.promises.result.reject = reject
+            this.promises.result.resolve = resolve
 
             let result;
 
@@ -598,11 +651,13 @@ export default class Bundle {
 
             try {
 
+                // ------------------- Direct Import ------------------- 
                 result = (isDirect) ? await this.import().catch(async e => {
                     if (this.#options.fallback === false) throw e
                     else await this.setBundler('objecturl') // fallback to objecturl
                 }) : undefined // try to import natively
 
+                // -------------------Text Compilation ------------------- 
                 try {
                     if (!result) {
                         if (isCircular) throw new Error(`Failed to import ${this.url} natively.`)
@@ -613,28 +668,32 @@ export default class Bundle {
                 // Handle Resolution Errors
                 catch (e) {
 
-                    if (this.options.fetch?.signal?.aborted) throw e
+                    if (e) {
+                        if (this.options.fetch?.signal?.aborted) throw e
 
-                    // TODO: Can use these as defaults
-                    else {
-                        const noBase = pathUtils.absolute(uri) ? pathUtils.noBase(uri, this.options, true) : pathUtils.noBase(this.url, this.options, true)
-                        console.warn(`Failed to fetch ${uri}. Checking filesystem references...`);
-                        const filesystemFallback = this.options.filesystem?._fallbacks?.[noBase];
-                        if (filesystemFallback) {
-                            console.warn(`Got fallback reference (module only) for ${uri}.`);
-                            result = filesystemFallback;
-                            Object.defineProperty(info, 'fallback', { value: true, enumerable: false })
-                        } else {
-                            const middle = "was not resolved locally. You can provide a direct reference to use in";
-                            if (e.message.includes(middle)) throw e;
-                            else throw errors.create(uri, noBase);
+                        // TODO: Can use these as defaults
+                        else {
+                            const noBase = pathUtils.absolute(uri) ? pathUtils.noBase(uri, this.options, true) : pathUtils.noBase(this.url, this.options, true)
+                            console.warn(`Failed to fetch ${uri}. Checking filesystem references...`);
+                            const filesystemFallback = this.options.filesystem?._fallbacks?.[noBase];
+                            if (filesystemFallback) {
+                                console.warn(`Got fallback reference (module only) for ${uri}.`);
+                                result = filesystemFallback;
+                                throw new Error('Fallbacks are broken...')
+                                // Object.defineProperty(info, 'fallback', { value: true, enumerable: false })
+                            } else {
+                                const middle = "was not resolved locally. You can provide a direct reference to use in";
+                                if (e.message.includes(middle)) throw e;
+                                else throw errors.create(uri, noBase);
+                            }
                         }
                     }
                 }
 
-                 await this.encoded // ensure properly encoded
+                await this.encoded // ensure properly encoded
                 this.status = 'success'
                 this.notify(this)
+
                 resolve(result)
             } catch (e) {
                 this.status = 'failed'               
