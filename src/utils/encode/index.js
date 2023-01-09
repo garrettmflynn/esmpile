@@ -8,7 +8,7 @@ import * as mimeTypes from '../mimeTypes.js'
 export const datauri = async (...args) => await get(datauriEncoder.get, ...args)
 export const objecturl = async (...args) => await get(objecturlEncoder.get, ...args)
 
-const importEncoded = async (uri, isJSON) => await ((isJSON) ? import(uri, { assert: { type: "json" } }) : import(uri)).catch((e) => {
+const importEncoded = async (uri, isJSON) => await ((isJSON) ? fetch(uri).then(res => res.json()) : import(uri)).catch((e) => {
     throw e
 });
 

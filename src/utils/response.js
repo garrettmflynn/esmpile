@@ -79,7 +79,7 @@ export const findModule = async (uri, opts) => {
     const info = {}
     await find(uri, opts, async (transformed) => {
         info.uri = transformed
-        info.result = await (isJSON ? import(transformed, { assert: { type: "json" } }) : import(transformed))
+        info.result = await (isJSON ? fetch(transformed).then(res => res.json()) : import(transformed))
     })
 
     return info
