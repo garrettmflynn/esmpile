@@ -16,7 +16,7 @@ const noEncoding = `No buffer or text to bundle for`
 // Import ES6 Modules (and replace their imports with actual file imports!)
 // TODO: Handle exports without stalling...
 // const re = /[^\n]*(?<![\/\/])(import|export)\s+([ \t]*(?:(?:\* (?:as .+))|(?:[^ \t\{\}]+[ \t]*,?)|(?:[ \t]*\{(?:[ \t]*[^ \t"'\{\}]+[ \t]*,?)+\}))[ \t]*)from[ \t]*(['"])([^'"\n]+)(?:['"])([ \t]*assert[ \t]*{[ \n\t]*type:[ \n\t]*(['"])([^'"\n]+)(?:['"])[\n\t]*})?/gm
-const re = /[^\n]*(?<![\/\/])(import)\s+([ \t]*(?:(?:\* (?:as .+))|(?:[^ \t\{\}]+[ \t]*,?)|(?:[ \t]*\{(?:[ \t]*[^ \t"'\{\}]+[ \t]*,?)+\}))[ \t]*)from[ \t]*(['"])([^'"\n]+)(?:['"])([ \t]*assert[ \t]*{[ \n\t]*type:[ \n\t]*(['"])([^'"\n]+)(?:['"])[\n\t]*})?;?/gm
+const re = /([^\n]*)(import)\s+([ \t]*(?:(?:\* (?:as .+))|(?:[^ \t\{\}]+[ \t]*,?)|(?:[ \t]*\{(?:[ \t]*[^ \t"'\{\}]+[ \t]*,?)+\}))[ \t]*)from[ \t]*(['"])([^'"\n]+)(?:['"])([ \t]*assert[ \t]*{[ \n\t]*type:[ \n\t]*(['"])([^'"\n]+)(?:['"])[\n\t]*})?;?/gm
 export function get(url, opts=this.options){
     const pathId = (url) ? pathUtils.pathId(url, opts) : undefined // Set Path ID
     let ref = globalThis.REMOTEESM_BUNDLES[opts.collection]
@@ -286,7 +286,10 @@ export default class Bundle {
                 this.imports = {} // permanent collection of imports
                 const imports = [] // temporary
                 const matches = Array.from(this.info.text.updated.matchAll(re))
-                matches.forEach(([original, prefix, command, delimiters, path]) => {
+                matches.forEach((matchInfo) => {
+
+                    const [original, before, prefix, command, delimiters, path] = matchInfo
+                    if (before.includes('//')) return; // No comments
 
                     if (path){
                         const wildcard = !!command.match(/\*\s+as/);
